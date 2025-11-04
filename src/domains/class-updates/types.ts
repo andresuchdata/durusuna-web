@@ -4,6 +4,7 @@ export interface ClassUpdate {
   content: string;
   createdAt: string;
   updatedAt: string;
+  className?: string;
   author: {
     id: string;
     name: string;

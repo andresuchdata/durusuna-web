@@ -14,6 +14,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: profile, isLoading } = useProfile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !profile) {
@@ -21,7 +26,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [profile, isLoading, router]);
 
-  if (isLoading) {
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!isMounted || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>

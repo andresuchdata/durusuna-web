@@ -16,6 +16,7 @@ export type Profile = {
   email: string;
   role?: string;
   avatarUrl?: string;
+  phone?: string;
 };
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {

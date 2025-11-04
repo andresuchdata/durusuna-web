@@ -1,14 +1,16 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useClassUpdates } from "@/domains/class-updates/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Share2, Image as ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Heart, MessageCircle, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import type { ClassUpdate } from "@/domains/class-updates/types";
+import { addReaction, addComment } from "@/domains/class-updates/api";
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -90,7 +92,10 @@ export default function ClassUpdatesPage() {
 
 // Class Update Card Component
 function ClassUpdateCard({ update }: { update: ClassUpdate }) {
-  const initials = update.author.name
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const initials = (update.author.name || 'U')
     .split(' ')
     .map(w => w[0])
     .join('')
@@ -99,8 +104,18 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
 
   const hasMedia = update.attachments && update.attachments.length > 0;
   const imageAttachments = update.attachments?.filter(a => a.type.startsWith('image/')) || [];
-  const reactionCount = update.reactions?.length || 0;
+  // Calculate total reaction count from all emoji types
+  const reactionCount = update.reactions?.reduce((sum, r) => sum + 1, 0) || 0;
   const commentCount = update.comments?.length || 0;
+  
+  // Group reactions by emoji
+  const reactionGroups = update.reactions?.reduce((acc, reaction) => {
+    if (!acc[reaction.emoji]) {
+      acc[reaction.emoji] = [];
+    }
+    acc[reaction.emoji].push(reaction);
+    return acc;
+  }, {} as Record<string, typeof update.reactions>);
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -120,11 +135,22 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
             </div>
           </div>
 
-          {/* Title */}
-          <h2 className="text-xl font-bold mb-2">{update.title}</h2>
+          {/* Title with Class Badge */}
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-xl font-bold">{update.title}</h2>
+            {update.className && (
+              <Badge variant="secondary" className="text-xs">
+                {update.className}
+              </Badge>
+            )}
+          </div>
 
-          {/* Content */}
-          <p className="text-sm text-foreground whitespace-pre-wrap">{update.content}</p>
+          {/* Content with basic formatting */}
+          <div className="text-sm text-foreground prose prose-sm max-w-none dark:prose-invert">
+            {update.content.split('\n').map((paragraph, idx) => (
+              <p key={idx} className="mb-2 last:mb-0">{paragraph}</p>
+            ))}
+          </div>
         </div>
 
         {/* Media Preview */}
@@ -159,17 +185,25 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
 
         {/* Actions */}
         <div className="p-4 border-t border-border">
-          {/* Reaction/Comment Count */}
-          {(reactionCount > 0 || commentCount > 0) && (
-            <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-              <div className="flex items-center gap-4">
-                {reactionCount > 0 && (
-                  <span>{reactionCount} {reactionCount === 1 ? 'reaction' : 'reactions'}</span>
-                )}
-                {commentCount > 0 && (
-                  <span>{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</span>
-                )}
-              </div>
+          {/* Reaction Display */}
+          {reactionGroups && Object.keys(reactionGroups).length > 0 && (
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              {Object.entries(reactionGroups).map(([emoji, reactions]) => (
+                <div
+                  key={emoji}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors cursor-pointer text-sm"
+                >
+                  <span>{emoji}</span>
+                  <span className="text-xs text-muted-foreground">{reactions.length}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Comment Count */}
+          {commentCount > 0 && (
+            <div className="text-sm text-muted-foreground mb-3">
+              <span>{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</span>
             </div>
           )}
 
