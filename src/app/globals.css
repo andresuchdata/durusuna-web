@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.75rem;
+  --background: #fafdfb;
+  --foreground: #0a3622;
+  --card: #ffffff;
+  --card-foreground: #0a3622;
+  --popover: #ffffff;
+  --popover-foreground: #0a3622;
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --secondary: #d1fae5;
+  --secondary-foreground: #065f46;
+  --muted: #f0fdf4;
+  --muted-foreground: #6b7280;
+  --accent: #d1fae5;
+  --accent-foreground: #065f46;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #d1fae5;
+  --input: #d1fae5;
+  --ring: #10b981;
+  --chart-1: #60a5fa;
+  --chart-2: #93c5fd;
+  --chart-3: #bfdbfe;
+  --chart-4: #dbeafe;
+  --chart-5: #eff6ff;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e5e7eb;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #3b82f6;
+}
+
+.dark {
+  --background: #0a3622;
+  --foreground: #f0fdf4;
+  --card: #134e3a;
+  --card-foreground: #f0fdf4;
+  --popover: #134e3a;
+  --popover-foreground: #f0fdf4;
+  --primary: #34d399;
+  --primary-foreground: #022c22;
+  --secondary: #166534;
+  --secondary-foreground: #d1fae5;
+  --muted: #14532d;
+  --muted-foreground: #86efac;
+  --accent: #166534;
+  --accent-foreground: #d1fae5;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #166534;
+  --input: #166534;
+  --ring: #34d399;
+  --chart-1: #93c5fd;
+  --chart-2: #bfdbfe;
+  --chart-3: #dbeafe;
+  --chart-4: #eff6ff;
+  --chart-5: #f0f9ff;
+  --sidebar: #1f2937;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #374151;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #4b5563;
+  --sidebar-ring: #60a5fa;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

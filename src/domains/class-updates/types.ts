@@ -1,0 +1,41 @@
+export interface ClassUpdate {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+  reactions?: Reaction[];
+  comments?: Comment[];
+  attachments?: Attachment[];
+}
+
+export interface Reaction {
+  id: string;
+  emoji: string;
+  userId: string;
+  userName: string;
+}
+
+export interface Comment {
+  id: string;
+  text: string;
+  createdAt: string;
+  author: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Durusuna",
+  "short_name": "Durusuna",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafdfb",
+  "theme_color": "#10b981",
+  "description": "School classroom chat and updates",
+  "icons": []
+}
