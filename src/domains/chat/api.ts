@@ -27,6 +27,10 @@ export async function getConversationMessages(
 }
 
 export async function sendMessage(conversationId: string, text: string): Promise<Message> {
-  const { data } = await http().post(`/conversations/${conversationId}/messages`, { text });
-  return data;
+  const { data } = await http().post(`/conversations/${conversationId}/messages`, { 
+    conversation_id: conversationId,
+    content: text,
+    message_type: 'text'
+  });
+  return data.message || data;
 }

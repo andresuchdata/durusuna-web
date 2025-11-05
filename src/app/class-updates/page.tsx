@@ -8,9 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Heart, MessageCircle, Share2, ChevronDown, ChevronUp } from "lucide-react";
-import type { ClassUpdate } from "@/domains/class-updates/types";
-import { addReaction, addComment } from "@/domains/class-updates/api";
+import { Heart, MessageCircle, Share2, ChevronDown, ChevronUp, Send, Bookmark } from "lucide-react";
+import { Input } from "@/components/ui/input"; // TODO: Add popover and scroll-area components
+import type { ClassUpdate, Comment } from "@/domains/class-updates/types";
+import { addReaction, addComment, getComments } from "@/domains/class-updates/api";
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -93,8 +94,12 @@ export default function ClassUpdatesPage() {
 // Class Update Card Component
 function ClassUpdateCard({ update }: { update: ClassUpdate }) {
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [showReactionPopover, setShowReactionPopover] = useState(false);
+  const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
   const initials = (update.author.name || 'U')
     .split(' ')
     .map(w => w[0])
@@ -116,6 +121,74 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
     acc[reaction.emoji].push(reaction);
     return acc;
   }, {} as Record<string, typeof update.reactions>);
+
+  // Check if current user has reacted with specific emoji
+  const hasUserReacted = (emoji: string) => {
+    return update.reactions?.some(r => r.emoji === emoji && r.userId === 'current-user');
+  };
+
+  // Common emojis for reactions
+  const commonEmojis = ['❤️', '👍', '😊', '🎉', '🤔', '😂', '👏', '🔥'];
+
+  // Handle adding reaction
+  const handleAddReaction = async (emoji: string) => {
+    if (isSubmittingReaction) return;
+    
+    setIsSubmittingReaction(true);
+    try {
+      await addReaction(update.id, emoji);
+      // TODO: Update local state or refetch
+      setShowReactionPopover(false);
+    } catch (error) {
+      console.error('Failed to add reaction:', error);
+    } finally {
+      setIsSubmittingReaction(false);
+    }
+  };
+
+  // Handle clicking existing reaction
+  const handleReactionClick = async (emoji: string) => {
+    if (hasUserReacted(emoji)) {
+      // Remove reaction if already reacted
+      // TODO: Implement remove reaction
+    } else {
+      // Add reaction if not yet reacted
+      await handleAddReaction(emoji);
+    }
+  };
+
+  // Handle loading comments
+  const handleLoadComments = async () => {
+    if (isLoadingComments) return;
+    
+    setIsLoadingComments(true);
+    try {
+      const commentsData = await getComments(update.id);
+      setComments(commentsData);
+      setShowComments(true);
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  // Handle submitting comment
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim() || isSubmittingComment) return;
+    
+    setIsSubmittingComment(true);
+    try {
+      const comment = await addComment(update.id, newComment);
+      setComments(prev => [comment, ...prev]);
+      setNewComment('');
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -191,10 +264,15 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
               {Object.entries(reactionGroups).map(([emoji, reactions]) => (
                 <div
                   key={emoji}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors cursor-pointer text-sm"
+                  onClick={() => handleReactionClick(emoji)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors cursor-pointer text-sm ${
+                    hasUserReacted(emoji) 
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
                 >
                   <span>{emoji}</span>
-                  <span className="text-xs text-muted-foreground">{reactions.length}</span>
+                  <span className="text-xs">{reactions.length}</span>
                 </div>
               ))}
             </div>
@@ -209,11 +287,41 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="flex-1 gap-2">
-              <Heart className="h-4 w-4" />
-              <span className="text-sm">React</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="flex-1 gap-2">
+            {/* TODO: Replace with Popover component when available */}
+            <div className="relative flex-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full gap-2"
+                onClick={() => setShowReactionPopover(!showReactionPopover)}
+              >
+                <Heart className="h-4 w-4" />
+                <span className="text-sm">React</span>
+              </Button>
+              {showReactionPopover && (
+                <div className="absolute bottom-full left-0 mb-2 p-2 bg-background border rounded-lg shadow-lg z-10">
+                  <div className="grid grid-cols-4 gap-1">
+                    {commonEmojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => handleAddReaction(emoji)}
+                        disabled={isSubmittingReaction}
+                        className="text-2xl p-2 hover:bg-muted rounded transition-colors disabled:opacity-50"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex-1 gap-2"
+              onClick={handleLoadComments}
+              disabled={isLoadingComments}
+            >
               <MessageCircle className="h-4 w-4" />
               <span className="text-sm">Comment</span>
             </Button>
@@ -221,7 +329,80 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
               <Share2 className="h-4 w-4" />
               <span className="text-sm">Share</span>
             </Button>
+            <Button variant="ghost" size="sm" className="flex-1 gap-2">
+              <Bookmark className="h-4 w-4" />
+              <span className="text-sm">Save</span>
+            </Button>
           </div>
+
+          {/* Comments Panel */}
+          {showComments && (
+            <div className="border-t border-border p-4 bg-muted/30">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-sm">Comments</h4>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowComments(false)}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Comment Input */}
+              <form onSubmit={handleSubmitComment} className="mb-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    disabled={isSubmittingComment}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="submit" 
+                    size="sm" 
+                    disabled={!newComment.trim() || isSubmittingComment}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </form>
+
+              {/* Comments List */}
+              {isLoadingComments ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="text-sm text-muted-foreground">Loading comments...</div>
+                </div>
+              ) : comments.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-3">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={comment.author?.avatar} />
+                        <AvatarFallback className="text-xs">
+                          {comment.author?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">{comment.author?.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(comment.createdAt)}
+                          </span>
+                        </div>
+                        <p className="text-sm break-words">{comment.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">No comments yet. Be the first to comment!</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

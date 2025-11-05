@@ -12,7 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: profile, isLoading } = useProfile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -84,17 +84,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 bg-[#1e3a5f] text-white border-r border-[#2c4f7c] transition-all duration-300 z-50 ${sidebarCollapsed ? 'md:w-16' : 'md:w-48'}`}>
-        <div className="flex flex-col flex-1 p-2">
-          <div className="flex items-center justify-between mb-4 pt-2">
-            {!sidebarCollapsed && (
-              <div className="flex-1">
-                <p className="text-sm text-blue-200 truncate">{profile.name}</p>
-              </div>
-            )}
+        <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarCollapsed ? 'p-1' : 'p-2'}`}>
+          <div className="flex items-center mb-4 pt-2 relative h-10">
+            <div className={`flex-1 overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>
+              <p className="text-sm text-blue-200 truncate">{profile.name}</p>
+            </div>
             <Button
               variant="ghost"
               size="sm"
-              className="text-white hover:bg-blue-700 hover:text-white flex-shrink-0"
+              className={`text-white hover:bg-blue-700 hover:text-white flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'ml-auto' : ''}`}
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             >
               <Menu className="h-5 w-5" />
@@ -108,7 +106,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Button
                   key={item.href}
                   variant="ghost"
-                  className={`w-full ${sidebarCollapsed ? 'justify-center px-2 py-5' : 'justify-start py-5'} ${isActive ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : 'text-white hover:bg-blue-700 hover:text-white'}`}
+                  className={`w-full transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-0 py-5' : 'justify-start py-5 px-3'} ${isActive ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : 'text-white hover:bg-blue-700 hover:text-white'}`}
                   onClick={() => router.push(item.href)}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
@@ -120,7 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </nav>
           <Button
             variant="ghost"
-            className={`w-full ${sidebarCollapsed ? 'justify-center px-2 py-5' : 'justify-start py-5'} text-white hover:bg-red-700 hover:text-white mt-4`}
+            className={`w-full transition-all duration-300 ${sidebarCollapsed ? 'justify-center px-0 py-5' : 'justify-start py-5 px-3'} text-white hover:bg-red-700 hover:text-white mt-4`}
             onClick={handleLogout}
             title={sidebarCollapsed ? 'Logout' : undefined}
           >

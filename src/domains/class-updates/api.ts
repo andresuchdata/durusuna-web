@@ -78,6 +78,11 @@ export async function getClassUpdate(id: string): Promise<ClassUpdate> {
   return data;
 }
 
+export async function getComments(updateId: string): Promise<Comment[]> {
+  const { data } = await axiosInstance.get(`/class-updates/${updateId}/comments`);
+  return data;
+}
+
 export async function addComment(updateId: string, text: string): Promise<Comment> {
   const { data } = await axiosInstance.post(`/class-updates/${updateId}/comments`, { text });
   return data;

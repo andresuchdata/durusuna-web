@@ -2,6 +2,7 @@ export type Conversation = {
   id: string;
   type: "direct" | "group";
   name?: string | null;
+  description?: string | null;
   avatar_url?: string | null;
   other_user?: {
     id: string;
@@ -15,6 +16,7 @@ export type Conversation = {
     last_name: string;
     name?: string;
     avatar_url?: string;
+    user_type?: string;
   }>;
   last_message?: {
     id: string;
@@ -46,4 +48,10 @@ export type Message = {
   created_at?: string;
   createdAt?: string;
   status?: "sent" | "delivered" | "read";
+  reactions?: Record<string, string[]>; // emoji -> array of user IDs
+  reply_to?: {
+    id: string;
+    content: string;
+    sender_name: string;
+  };
 };
