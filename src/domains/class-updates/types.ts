@@ -1,7 +1,10 @@
 export interface ClassUpdate {
   id: string;
+  classId?: string;
   title: string;
   content: string;
+  updateType?: 'announcement' | 'homework' | 'reminder' | 'event';
+  isPinned?: boolean;
   createdAt: string;
   updatedAt: string;
   className?: string;

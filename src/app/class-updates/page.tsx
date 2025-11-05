@@ -1,17 +1,39 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { useClassUpdates } from "@/domains/class-updates/hooks";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useClassUpdates, useClasses, useTeachers } from "@/domains/class-updates/hooks";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Heart, MessageCircle, Share2, ChevronDown, ChevronUp, Send, Bookmark } from "lucide-react";
-import { Input } from "@/components/ui/input"; // TODO: Add popover and scroll-area components
+import { Heart, MessageCircle, Share2, ChevronUp, Send, Bookmark, Search, Filter, X, Plus, MoreVertical, Edit, Trash2, Pin, PinOff } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CreateClassUpdateDialog } from "@/components/class-updates/CreateClassUpdateDialog";
+import { EditClassUpdateDialog } from "@/components/class-updates/EditClassUpdateDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useProfile } from "@/domains/auth/hooks";
+import { MediaViewer, MediaThumbnailGrid, type MediaItem } from "@/components/media/MediaViewer";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ClassUpdate, Comment } from "@/domains/class-updates/types";
-import { addReaction, addComment, getComments } from "@/domains/class-updates/api";
+import { addReaction, addComment, getComments, ClassUpdateFilters, deleteClassUpdate, togglePinClassUpdate } from "@/domains/class-updates/api";
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -28,15 +50,246 @@ function formatDate(dateStr: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// Searchable Teacher Filter Dropdown Component
+function TeacherFilterDropdown({ 
+  teachers, 
+  selectedTeacherId, 
+  onSelect 
+}: { 
+  teachers?: Array<{ id: string; name: string }>;
+  selectedTeacherId?: string;
+  onSelect: (teacherId: string | undefined) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const filteredTeachers = useMemo(() => {
+    if (!teachers) return [];
+    if (!searchQuery) return teachers;
+    return teachers.filter(t => 
+      t.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [teachers, searchQuery]);
+
+  const selectedTeacher = teachers?.find(t => t.id === selectedTeacherId);
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 text-xs bg-white border-gray-200 hover:bg-gray-50">
+          <Filter className="h-3 w-3 mr-1" />
+          {selectedTeacher ? selectedTeacher.name : 'Teacher'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56 bg-white">
+        <DropdownMenuLabel className="text-xs">Filter by Teacher</DropdownMenuLabel>
+        <div className="px-2 pb-2">
+          <Input
+            type="text"
+            placeholder="Search teachers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 text-xs bg-white"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+        <DropdownMenuSeparator />
+        <div className="max-h-48 overflow-y-auto">
+          <DropdownMenuItem 
+            onClick={() => {
+              onSelect(undefined);
+              setSearchQuery("");
+              setOpen(false);
+            }} 
+            className="text-xs"
+          >
+            All Teachers
+          </DropdownMenuItem>
+          {filteredTeachers.length > 0 ? (
+            filteredTeachers.map((teacher) => (
+              <DropdownMenuItem
+                key={teacher.id}
+                onClick={() => {
+                  onSelect(teacher.id);
+                  setSearchQuery("");
+                  setOpen(false);
+                }}
+                className="text-xs"
+              >
+                {teacher.name}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              No teachers found
+            </div>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function ClassUpdatesPage() {
-  const { data, isLoading, error, refetch } = useClassUpdates();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<ClassUpdateFilters>({});
+  const [activeFilters, setActiveFilters] = useState<ClassUpdateFilters>({});
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { data: profile } = useProfile();
+
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  // Apply search debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Combine active filters with search
+  const queryFilters = useMemo(() => ({
+    ...activeFilters,
+    search: debouncedSearch || undefined,
+  }), [activeFilters, debouncedSearch]);
+
+  const { data, isLoading, error, refetch } = useClassUpdates(queryFilters);
+  const { data: classes } = useClasses();
+  const { data: teachers } = useTeachers();
+
+  const hasActiveFilters = Object.keys(activeFilters).length > 0 || searchQuery.length > 0;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilters({});
+    setActiveFilters({});
+  };
+
+  const applyFilter = (key: keyof ClassUpdateFilters, value: string | undefined) => {
+    const newFilters = { ...filters, [key]: value };
+    if (!value) {
+      delete newFilters[key];
+    }
+    setFilters(newFilters);
+    setActiveFilters(newFilters);
+  };
+
+  const updateTypes = [
+    { value: 'announcement', label: 'Announcement' },
+    { value: 'homework', label: 'Homework' },
+    { value: 'reminder', label: 'Reminder' },
+    { value: 'event', label: 'Event' },
+  ];
+
+  const handleCreateSuccess = () => {
+    refetch();
+  };
+
+  // Check if user is a teacher (can create updates)
+  const canCreateUpdate = profile?.user_type !== 'student';
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-4 md:p-6 max-w-full md:max-w-3xl">
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Class Updates</h1>
-          <p className="text-muted-foreground mt-1">Stay updated with your school community</p>
+      <div className="container mx-auto p-4 max-w-full md:max-w-3xl">
+        <div className="mb-4">
+          <h1 className="text-xl md:text-2xl font-bold">Class Updates</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Stay updated with your school community</p>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="mb-4 space-y-2">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search updates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9 h-9 bg-white border-gray-200 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Dropdowns - Compact Row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground font-medium">Filters:</span>
+            
+            {/* Class Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs bg-white border-gray-200 hover:bg-gray-50">
+                  <Filter className="h-3 w-3 mr-1" />
+                  {filters.class_id ? classes?.find(c => c.id === filters.class_id)?.name : 'Class'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 bg-white">
+                <DropdownMenuLabel className="text-xs">Filter by Class</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => applyFilter('class_id', undefined)} className="text-xs">
+                  All Classes
+                </DropdownMenuItem>
+                {classes?.map((cls) => (
+                  <DropdownMenuItem
+                    key={cls.id}
+                    onClick={() => applyFilter('class_id', cls.id)}
+                    className="text-xs"
+                  >
+                    {cls.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Teacher Filter with Search */}
+            <TeacherFilterDropdown 
+              teachers={teachers}
+              selectedTeacherId={filters.author_id}
+              onSelect={(teacherId) => applyFilter('author_id', teacherId)}
+            />
+
+            {/* Type Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs bg-white border-gray-200 hover:bg-gray-50">
+                  <Filter className="h-3 w-3 mr-1" />
+                  {filters.update_type ? updateTypes.find(t => t.value === filters.update_type)?.label : 'Type'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44 bg-white">
+                <DropdownMenuLabel className="text-xs">Filter by Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => applyFilter('update_type', undefined)} className="text-xs">
+                  All Types
+                </DropdownMenuItem>
+                {updateTypes.map((type) => (
+                  <DropdownMenuItem
+                    key={type.value}
+                    onClick={() => applyFilter('update_type', type.value as 'announcement' | 'homework' | 'reminder' | 'event')}
+                    className="text-xs"
+                  >
+                    {type.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-gray-500 hover:text-gray-700">
+                <X className="h-3 w-3 mr-1" />
+                Clear all
+              </Button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -77,7 +330,7 @@ export default function ClassUpdatesPage() {
         ) : data && data.length > 0 ? (
           <div className="space-y-4">
             {data.map((update) => (
-              <ClassUpdateCard key={update.id} update={update} />
+              <ClassUpdateCard key={update.id} update={update} onUpdate={refetch} />
             ))}
           </div>
         ) : (
@@ -86,13 +339,32 @@ export default function ClassUpdatesPage() {
             <p className="text-sm mt-2">Check back later for announcements and updates</p>
           </div>
         )}
+
+        {/* Floating Action Button */}
+        {canCreateUpdate && (
+          <button
+            onClick={() => setCreateDialogOpen(true)}
+            className="fixed bottom-20 md:bottom-8 right-4 md:right-8 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40"
+            aria-label="Create class update"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+        )}
+
+        {/* Create Dialog */}
+        <CreateClassUpdateDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onSuccess={handleCreateSuccess}
+          classes={classes}
+        />
       </div>
     </AppLayout>
   );
 }
 
 // Class Update Card Component
-function ClassUpdateCard({ update }: { update: ClassUpdate }) {
+function ClassUpdateCard({ update, onUpdate }: { update: ClassUpdate; onUpdate?: () => void }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -100,6 +372,16 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [showReactionPopover, setShowReactionPopover] = useState(false);
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
+  const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
+  const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
+  const [showMenu, setShowMenu] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  const { data: profile } = useProfile();
+  
   const initials = (update.author.name || 'U')
     .split(' ')
     .map(w => w[0])
@@ -107,10 +389,20 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
     .slice(0, 2)
     .toUpperCase();
 
-  const hasMedia = update.attachments && update.attachments.length > 0;
-  const imageAttachments = update.attachments?.filter(a => a.type.startsWith('image/')) || [];
-  // Calculate total reaction count from all emoji types
-  const reactionCount = update.reactions?.reduce((sum, r) => sum + 1, 0) || 0;
+  const mediaItems: MediaItem[] = update.attachments?.map(att => ({
+    id: att.id,
+    name: att.name,
+    url: att.url,
+    type: att.type,
+    size: att.size,
+  })) || [];
+  
+  // Debug: Log attachments to console
+  if (update.attachments && update.attachments.length > 0) {
+    console.log('Update attachments:', update.attachments);
+    console.log('Media items:', mediaItems);
+  }
+  
   const commentCount = update.comments?.length || 0;
   
   // Group reactions by emoji
@@ -181,7 +473,7 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
     setIsSubmittingComment(true);
     try {
       const comment = await addComment(update.id, newComment);
-      setComments(prev => [comment, ...prev]);
+      setComments(prev => [comment, ...(Array.isArray(prev) ? prev : [])]);
       setNewComment('');
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -190,21 +482,133 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
     }
   };
 
+  // Handle delete
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteClassUpdate(update.id);
+      setShowDeleteDialog(false);
+      onUpdate?.(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to delete update:', error);
+      alert('Failed to delete update. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowMenu(false);
+    setShowDeleteDialog(true);
+  };
+
+  const handleEditClick = () => {
+    setShowMenu(false);
+    setShowEditDialog(true);
+  };
+
+  const handleEditSuccess = () => {
+    onUpdate?.(); // Refresh the list
+  };
+
+  // Handle pin/unpin
+  const handleTogglePin = async () => {
+    setIsPinning(true);
+    try {
+      await togglePinClassUpdate(update.id, !update.isPinned);
+      onUpdate?.(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to toggle pin:', error);
+      alert('Failed to pin/unpin update. Please try again.');
+    } finally {
+      setIsPinning(false);
+      setShowMenu(false);
+    }
+  };
+
+  // Check if current user is the author
+  const isAuthor = profile?.id === update.author.id;
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <CardContent className="p-0">
+        {/* Pinned Indicator */}
+        {update.isPinned && (
+          <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800 px-4 py-2 flex items-center gap-2">
+            <Pin className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Pinned</span>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="p-4">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-start gap-3 mb-4">
             <Avatar className="h-12 w-12">
               <AvatarImage src={update.author.avatar} />
               <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <h3 className="font-semibold text-base">{update.author.name}</h3>
-              <p className="text-xs text-muted-foreground">{formatDate(update.createdAt)}</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base">{update.author.name}</h3>
+                  <p className="text-xs text-muted-foreground">{formatDate(update.createdAt)}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {update.updateType && (
+                    <Badge 
+                      variant={
+                        update.updateType === 'homework' ? 'destructive' :
+                        update.updateType === 'event' ? 'default' :
+                        update.updateType === 'reminder' ? 'outline' :
+                        'secondary'
+                      }
+                      className="text-xs capitalize"
+                    >
+                      {update.updateType}
+                    </Badge>
+                  )}
+                  
+                  {/* Three-dot menu (author only) */}
+                  {isAuthor && (
+                    <DropdownMenu open={showMenu} onOpenChange={setShowMenu}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={handleTogglePin} disabled={isPinning}>
+                          {update.isPinned ? (
+                            <>
+                              <PinOff className="h-4 w-4 mr-2" />
+                              Unpin
+                            </>
+                          ) : (
+                            <>
+                              <Pin className="h-4 w-4 mr-2" />
+                              Pin
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleEditClick}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={handleDeleteClick}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -227,32 +631,22 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
         </div>
 
         {/* Media Preview */}
-        {imageAttachments.length > 0 && (
-          <div className="relative bg-gray-100 dark:bg-gray-800">
-            {imageAttachments.length === 1 ? (
-              <img
-                src={imageAttachments[0].url}
-                alt={imageAttachments[0].name}
-                className="w-full h-auto max-h-96 object-cover"
-              />
-            ) : (
-              <div className="grid grid-cols-2 gap-1">
-                {imageAttachments.slice(0, 4).map((img, idx) => (
-                  <div key={img.id} className="relative aspect-square">
-                    <img
-                      src={img.url}
-                      alt={img.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {idx === 3 && imageAttachments.length > 4 && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="text-white text-2xl font-bold">+{imageAttachments.length - 4}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+        {mediaItems.length > 0 && (
+          <div className="relative">
+            <MediaThumbnailGrid
+              items={mediaItems}
+              onItemClick={(index) => {
+                setMediaViewerIndex(index);
+                setMediaViewerOpen(true);
+              }}
+            />
+          </div>
+        )}
+        
+        {/* Debug: Show if attachments exist but not displaying */}
+        {update.attachments && update.attachments.length > 0 && mediaItems.length === 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 p-4 text-sm text-yellow-800">
+            Debug: {update.attachments.length} attachment(s) found but not displaying. Check console.
           </div>
         )}
 
@@ -286,17 +680,17 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2">
             {/* TODO: Replace with Popover component when available */}
             <div className="relative flex-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="w-full gap-2"
+                className="w-full gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4"
                 onClick={() => setShowReactionPopover(!showReactionPopover)}
               >
-                <Heart className="h-4 w-4" />
-                <span className="text-sm">React</span>
+                <Heart className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">React</span>
               </Button>
               {showReactionPopover && (
                 <div className="absolute bottom-full left-0 mb-2 p-2 bg-background border rounded-lg shadow-lg z-10">
@@ -318,20 +712,20 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
             <Button 
               variant="ghost" 
               size="sm" 
-              className="flex-1 gap-2"
+              className="flex-1 gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4"
               onClick={handleLoadComments}
               disabled={isLoadingComments}
             >
-              <MessageCircle className="h-4 w-4" />
-              <span className="text-sm">Comment</span>
+              <MessageCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Comment</span>
             </Button>
-            <Button variant="ghost" size="sm" className="flex-1 gap-2">
-              <Share2 className="h-4 w-4" />
-              <span className="text-sm">Share</span>
+            <Button variant="ghost" size="sm" className="flex-1 gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4">
+              <Share2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
-            <Button variant="ghost" size="sm" className="flex-1 gap-2">
-              <Bookmark className="h-4 w-4" />
-              <span className="text-sm">Save</span>
+            <Button variant="ghost" size="sm" className="flex-1 gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4">
+              <Bookmark className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Save</span>
             </Button>
           </div>
 
@@ -404,7 +798,50 @@ function ClassUpdateCard({ update }: { update: ClassUpdate }) {
             </div>
           )}
         </div>
+
+        {/* Media Viewer */}
+        <MediaViewer
+          items={mediaItems}
+          initialIndex={mediaViewerIndex}
+          open={mediaViewerOpen}
+          onOpenChange={setMediaViewerOpen}
+        />
       </CardContent>
+
+      {/* Edit Dialog */}
+      <EditClassUpdateDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        onSuccess={handleEditSuccess}
+        update={update}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Class Update</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this update? This action cannot be undone.
+              {update.title && (
+                <span className="block mt-2 font-semibold text-foreground">
+                  &ldquo;{update.title}&rdquo;
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

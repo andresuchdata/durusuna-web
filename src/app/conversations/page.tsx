@@ -6,7 +6,7 @@ import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -19,7 +19,7 @@ export default function ChatsPage() {
     <AppLayout>
       <div className="flex h-screen">
         {/* Conversations List */}
-        <div className="w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col">
+        <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
           {/* WhatsApp-style Header */}
           <div className="bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-white">Chats</h1>
@@ -47,16 +47,16 @@ export default function ChatsPage() {
           {/* Conversations List */}
           <div className="flex-1 overflow-y-auto bg-white dark:bg-[#111b21]">
             {isLoading ? (
-              <div>
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 border-b border-border dark:border-[#2a3942]">
-                    <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-12" />
+              <div className="animate-pulse">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-4 border-b border-border dark:border-[#2a3942] hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]">
+                    <Skeleton className="h-12 w-12 rounded-full flex-shrink-0 bg-gray-200 dark:bg-[#2a3942]" />
+                    <div className="flex-1 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <Skeleton className="h-4 w-32 bg-gray-200 dark:bg-[#2a3942]" />
+                        <Skeleton className="h-3 w-12 bg-gray-200 dark:bg-[#2a3942]" />
                       </div>
-                      <Skeleton className="h-3 w-3/4" />
+                      <Skeleton className="h-3 w-3/4 bg-gray-200 dark:bg-[#2a3942]" />
                     </div>
                   </div>
                 ))}
@@ -84,12 +84,21 @@ export default function ChatsPage() {
         </div>
 
         {/* Conversation Detail or Empty State */}
-        <div className="hidden md:flex flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a]">
+        <div className={`flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a] ${selectedId ? 'flex' : 'hidden md:flex'}`}>
           {selectedId && selectedConversation ? (
             <>
               {/* WhatsApp-style Conversation Header */}
               <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-4 py-2 flex items-center justify-between border-b border-border dark:border-[#2a3942]">
                 <div className="flex items-center gap-3">
+                  {/* Back button for mobile */}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="md:hidden h-10 w-10 p-0 mr-1" 
+                    onClick={() => setSelectedId(null)}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={
                       (selectedConversation.type === 'direct' && selectedConversation.other_user

@@ -17,6 +17,7 @@ export type Profile = {
   role?: string;
   avatarUrl?: string;
   phone?: string;
+  user_type?: string;
 };
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {

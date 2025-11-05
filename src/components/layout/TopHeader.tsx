@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/domains/auth/hooks";
 
-export function TopHeader({ sidebarCollapsed }: { sidebarCollapsed?: boolean }) {
+export function TopHeader({ 
+  sidebarCollapsed,
+  onToggleMobileSidebar 
+}: { 
+  sidebarCollapsed?: boolean;
+  onToggleMobileSidebar?: () => void;
+}) {
   const { data: profile } = useProfile();
   const pathname = usePathname();
 
@@ -27,19 +33,28 @@ export function TopHeader({ sidebarCollapsed }: { sidebarCollapsed?: boolean }) 
   const unreadClassUpdates = 0;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#1e3a5f] to-[#2c4f7c] dark:from-[#1a2f4d] dark:to-[#253d5f] border-b border-[#2c4f7c] shadow-lg">
-      <div className="px-4 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50 border-b border-slate-200 shadow-sm">
+      <div className="px-4 h-12 flex items-center justify-between">
         <div className={`flex items-center gap-3 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-48'}`}>
-          <h1 className="text-xl font-bold text-white">Durusuna</h1>
+          {/* Mobile hamburger menu */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="md:hidden h-8 w-8 p-0 text-slate-600 hover:bg-slate-100"
+            onClick={onToggleMobileSidebar}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-bold text-slate-700">Durusuna</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Notification Bell */}
           <Link href="/class-updates">
-            <Button variant="ghost" size="sm" className="relative text-white hover:bg-white/10">
-              <Bell className="h-5 w-5" />
+            <Button variant="ghost" size="sm" className="relative text-slate-600 hover:bg-slate-100 h-8 w-8 p-0">
+              <Bell className="h-4 w-4" />
               {unreadClassUpdates > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
                   {unreadClassUpdates > 9 ? "9+" : unreadClassUpdates}
                 </span>
               )}
@@ -48,9 +63,9 @@ export function TopHeader({ sidebarCollapsed }: { sidebarCollapsed?: boolean }) 
 
           {/* Profile Avatar */}
           <Link href="/profile">
-            <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-transparent hover:ring-blue-300 dark:hover:ring-blue-500 transition-all">
+            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-slate-300 transition-all">
               <AvatarImage src={profile.avatarUrl} />
-              <AvatarFallback className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 text-sm font-semibold">
+              <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>

@@ -1,10 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getClassUpdates, getClassUpdate, addComment, addReaction, removeReaction } from "./api";
+import { getClassUpdates, getClassUpdate, addComment, addReaction, removeReaction, getClasses, getTeachers, ClassUpdateFilters } from "./api";
 
-export function useClassUpdates() {
+export function useClassUpdates(filters?: ClassUpdateFilters) {
   return useQuery({
-    queryKey: ["class-updates"],
-    queryFn: getClassUpdates,
+    queryKey: ["class-updates", filters],
+    queryFn: () => getClassUpdates(filters),
+  });
+}
+
+export function useClasses() {
+  return useQuery({
+    queryKey: ["classes"],
+    queryFn: getClasses,
+  });
+}
+
+export function useTeachers() {
+  return useQuery({
+    queryKey: ["teachers"],
+    queryFn: getTeachers,
   });
 }
 
