@@ -25,6 +25,7 @@ export default function ChatsPage() {
   const [typingInConversations, setTypingInConversations] = useState<Set<string>>(new Set());
   const selectedConversation = data?.find(c => c.id === selectedId);
   const { toggleMobileSidebar } = useSidebar();
+  const { mutate: markAsRead } = useMarkConversationAsRead();
 
   // Join all conversation rooms on mount
   useEffect(() => {
@@ -52,6 +53,17 @@ export default function ChatsPage() {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  // Mark conversation as read when selected
+  useEffect(() => {
+    if (selectedId) {
+      // Mark as read after a short delay to ensure the user is viewing it
+      const timer = setTimeout(() => {
+        markAsRead(selectedId);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedId, markAsRead]);
 
   // Listen for global typing and message events
   useEffect(() => {
@@ -103,6 +115,14 @@ export default function ChatsPage() {
         queryClient.invalidateQueries({ 
           queryKey: ["chat", "conversations"]
         });
+        
+        // Auto-mark as read if this message is for the currently selected conversation
+        if (selectedIdRef.current === convId) {
+          // Small delay to ensure the message is processed first
+          setTimeout(() => {
+            markAsRead(convId);
+          }, 100);
+        }
       }
     };
     
@@ -122,7 +142,7 @@ export default function ChatsPage() {
       socket.off('conversation:created', handleConversationCreated);
       socket.off('message:new', handleMessageNew);
     };
-  }, [queryClient]);
+  }, [queryClient, markAsRead]);
 
   return (
     <AppLayout hideBottomNav={!!selectedId}>
@@ -319,12 +339,17 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const { mutate: markAsReadInDetail } = useMarkConversationAsRead();
+  
   useChatRealtime(conversationId, {
     onMessageNew: () => {
       // Message will be added via the hook, scroll after state updates
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 200);
+      
+      // Mark as read since we're viewing this conversation
+      markAsReadInDetail(conversationId);
     },
     onTypingStart: (userId) => {
       if (userId !== me) {
@@ -461,7 +486,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 }
 
 // Import required hooks
-import { useConversationMessages, useSendMessage } from "@/domains/chat/hooks";
+import { useConversationMessages, useSendMessage, useMarkConversationAsRead } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";

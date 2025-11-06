@@ -77,3 +77,7 @@ export async function createConversation(params: {
   const { data } = await http().post('/conversations', params);
   return data.conversation;
 }
+
+export async function markConversationAsRead(conversationId: string): Promise<void> {
+  await http().put(`/conversations/${conversationId}/mark-read`);
+}

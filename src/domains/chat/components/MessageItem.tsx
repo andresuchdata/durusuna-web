@@ -79,8 +79,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
         setShowReactionPicker(false);
       }}
     >
-      {/* Avatar for others' messages */}
-      {!isMine && (
+      {/* Avatar for others' messages (only in group chats) */}
+      {!isMine && conversationType === "group" && (
         <Avatar 
           className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity mt-1" 
           onClick={() => onAvatarClick?.(senderId || "")}

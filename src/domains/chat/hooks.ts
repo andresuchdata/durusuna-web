@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getConversations, getConversationMessages, sendMessage, createConversation } from "./api";
+import { getConversations, getConversationMessages, sendMessage, createConversation, markConversationAsRead } from "./api";
 import type { Conversation, Message } from "./types";
 import { useChatRealtime } from "./realtime";
 
@@ -128,6 +128,26 @@ export function useCreateConversation() {
       description?: string;
     }) => createConversation(params),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
+    },
+  });
+}
+
+export function useMarkConversationAsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) => markConversationAsRead(conversationId),
+    onSuccess: (_, conversationId) => {
+      // Update the conversations list to reset unread count
+      qc.setQueryData<Conversation[]>(["chat", "conversations"], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map((conv) =>
+          conv.id === conversationId
+            ? { ...conv, unread_count: 0 }
+            : conv
+        );
+      });
+      // Also invalidate to ensure fresh data
       qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
     },
   });
