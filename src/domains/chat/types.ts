@@ -21,6 +21,7 @@ export type Conversation = {
   last_message?: {
     id: string;
     text?: string;
+    content?: string;
     sender_id: string;
     created_at: string;
   } | null;

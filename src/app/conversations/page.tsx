@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
@@ -10,12 +10,84 @@ import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu } from "lucid
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { getSocket } from "@/core/realtime/socket";
+import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
+import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
+import { AnimatePresence } from "framer-motion";
 
 export default function ChatsPage() {
   const { data, isLoading, error, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showNewConversation, setShowNewConversation] = useState(false);
+  const [typingInConversations, setTypingInConversations] = useState<Set<string>>(new Set());
   const selectedConversation = data?.find(c => c.id === selectedId);
   const { toggleMobileSidebar } = useSidebar();
+
+  // Listen for global typing events
+  useEffect(() => {
+    const socket = getSocket();
+    
+    const handleTypingStart = (data: any) => {
+      const convId = data?.conversationId || data?.conversation_id;
+      if (convId) {
+        console.log('[ChatsPage] Typing started in conversation:', convId);
+        setTypingInConversations(prev => {
+          const next = new Set(prev);
+          next.add(convId);
+          console.log('[ChatsPage] Current typing conversations:', Array.from(next));
+          return next;
+        });
+        
+        // Auto-clear after 3 seconds as fallback
+        setTimeout(() => {
+          console.log('[ChatsPage] Auto-clearing typing for conversation:', convId);
+          setTypingInConversations(prev => {
+            const next = new Set(prev);
+            next.delete(convId);
+            return next;
+          });
+        }, 3500);
+      }
+    };
+    
+    const handleTypingStop = (data: any) => {
+      const convId = data?.conversationId || data?.conversation_id;
+      if (convId) {
+        console.log('[ChatsPage] Typing stopped in conversation:', convId);
+        setTypingInConversations(prev => {
+          const next = new Set(prev);
+          next.delete(convId);
+          console.log('[ChatsPage] After stop, typing conversations:', Array.from(next));
+          return next;
+        });
+      }
+    };
+    
+    const handleConversationCreated = (data: any) => {
+      console.log('[ChatsPage] New conversation created:', data);
+      refetch(); // Refetch conversation list
+    };
+    
+    const handleMessageNew = (data: any) => {
+      const convId = data?.conversationId || data?.conversation_id || data?.message?.conversation_id;
+      console.log('[ChatsPage] New message in conversation:', convId);
+      if (convId) {
+        refetch(); // Refetch to update unread counts and last message
+      }
+    };
+    
+    socket.on('typing:start', handleTypingStart);
+    socket.on('typing:stop', handleTypingStop);
+    socket.on('conversation:created', handleConversationCreated);
+    socket.on('message:new', handleMessageNew);
+    
+    return () => {
+      socket.off('typing:start', handleTypingStart);
+      socket.off('typing:stop', handleTypingStop);
+      socket.off('conversation:created', handleConversationCreated);
+      socket.off('message:new', handleMessageNew);
+    };
+  }, [refetch]);
 
   return (
     <AppLayout hideBottomNav={!!selectedId}>
@@ -26,7 +98,13 @@ export default function ChatsPage() {
           <div className="bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-white">Chats</h1>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-[#2a3942] h-9 w-9 p-0">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0"
+                onClick={() => setShowNewConversation(true)}
+                title="New Conversation"
+              >
                 <Edit className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="sm" className="text-white hover:bg-[#2a3942] h-9 w-9 p-0">
@@ -70,11 +148,15 @@ export default function ChatsPage() {
               </div>
             ) : data && data.length > 0 ? (
               <div>
-                {data.map((c) => (
-                  <div key={c.id} onClick={() => setSelectedId(c.id)} className="cursor-pointer">
-                    <ConversationItem c={c} isSelected={selectedId === c.id} />
-                  </div>
-                ))}
+              {data.map((c) => (
+                <div key={c.id} onClick={() => setSelectedId(c.id)} className="cursor-pointer">
+                  <ConversationItem 
+                    c={c} 
+                    isSelected={selectedId === c.id}
+                    isTyping={typingInConversations.has(c.id)}
+                  />
+                </div>
+              ))}
               </div>
             ) : (
               <div className="p-8 text-center text-muted-foreground">
@@ -89,8 +171,8 @@ export default function ChatsPage() {
         <div className={`flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a] ${selectedId ? 'flex' : 'hidden md:flex'}`}>
           {selectedId && selectedConversation ? (
             <>
-              {/* WhatsApp-style Conversation Header */}
-              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942]">
+              {/* WhatsApp-style Conversation Header - Sticky */}
+              <div className="sticky top-0 z-10 bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942]">
                 {/* Back button for mobile */}
                 <Button 
                   variant="ghost" 
@@ -178,6 +260,12 @@ export default function ChatsPage() {
           )}
         </div>
       </div>
+
+      {/* New Conversation Dialog */}
+      <NewConversationDialog
+        open={showNewConversation}
+        onClose={() => setShowNewConversation(false)}
+      />
     </AppLayout>
   );
 }
@@ -192,17 +280,75 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [theirTyping, setTheirTyping] = useState(false);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useChatRealtime(conversationId, {
-    onTypingStart: () => setTheirTyping(true),
-    onTypingStop: () => setTheirTyping(false),
+    onMessageNew: () => {
+      console.log('[ConversationDetail] New message received, will scroll to bottom');
+      // Message will be added via the hook, scroll after state updates
+      setTimeout(() => {
+        console.log('[ConversationDetail] Scrolling to bottom');
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 200);
+    },
+    onTypingStart: (userId) => {
+      console.log('[ConversationDetail] Typing started by:', userId, 'me:', me);
+      if (userId !== me) {
+        setTheirTyping(true);
+        
+        // Auto-clear after 3.5 seconds as fallback
+        setTimeout(() => {
+          console.log('[ConversationDetail] Auto-clearing typing indicator');
+          setTheirTyping(false);
+        }, 3500);
+      }
+    },
+    onTypingStop: (userId) => {
+      console.log('[ConversationDetail] Typing stopped by:', userId, 'me:', me);
+      if (userId !== me) {
+        setTheirTyping(false);
+      }
+    },
   });
 
+  // Handle typing stop after user stops typing
   useEffect(() => {
     if (!isTyping) return;
-    const t = setTimeout(() => setIsTyping(false), 1200);
-    return () => clearTimeout(t);
-  }, [isTyping]);
+    
+    const timer = setTimeout(() => {
+      console.log('[ConversationDetail] User stopped typing, emitting typing:stop');
+      setIsTyping(false);
+      
+      const socket = getSocket();
+      if (socket.connected && conversationId) {
+        socket.emit("typing:stop", { conversationId });
+        console.log('[ConversationDetail] Emitted typing:stop');
+      }
+    }, 2000); // Stop after 2 seconds of no typing
+    
+    return () => clearTimeout(timer);
+  }, [isTyping, conversationId]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (items.length > 0) {
+      // Use setTimeout to ensure DOM has updated
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [items.length]);
+
+  // Also scroll when items array reference changes (for realtime messages)
+  useEffect(() => {
+    if (items.length > 0) {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [items]);
 
   async function onSend(e: React.FormEvent) {
     e.preventDefault();
@@ -230,22 +376,50 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
             {items.map((msg) => (
               <MessageItem key={msg.id} m={msg} me={me} />
             ))}
+            
+            {/* Typing indicator */}
+            <AnimatePresence>
+              {theirTyping && <TypingIndicator />}
+            </AnimatePresence>
+            
+            {/* Invisible element to scroll to */}
+            <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
       {/* Composer - Above mobile nav */}
-      <div className="p-3 md:p-4 bg-white dark:bg-card border-t border-border pb-safe">
+      <div className="p-3 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom)+12px)] md:pb-4 bg-white dark:bg-card border-t border-border">
         <form onSubmit={onSend} className="flex gap-2">
-          <Input
+          <input
             ref={inputRef}
             value={text}
             onChange={(e) => {
-              setText(e.target.value);
-              setIsTyping(true);
+              const newValue = e.target.value;
+              console.log('[ConversationDetail] Text changed, value:', newValue);
+              setText(newValue);
+              
+              // Emit typing event DIRECTLY here
+              if (!isTyping && conversationId) {
+                console.log('[ConversationDetail] Emitting typing:start DIRECTLY from onChange');
+                setIsTyping(true);
+                
+                const socket = getSocket();
+                if (socket.connected) {
+                  console.log('[ConversationDetail] Socket connected, emitting now');
+                  socket.emit("typing:start", { conversationId });
+                } else {
+                  console.log('[ConversationDetail] Socket not connected, waiting...');
+                  socket.once('connect', () => {
+                    console.log('[ConversationDetail] Socket connected, emitting now');
+                    socket.emit("typing:start", { conversationId });
+                  });
+                }
+              }
             }}
             placeholder="Type a message"
-            className="flex-1 bg-background"
+            className="flex-1 h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            disabled={isPending}
           />
           <Button type="submit" disabled={isPending || !text.trim()} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
             Send
@@ -261,4 +435,3 @@ import { useConversationMessages, useSendMessage } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";
-import { useEffect, useRef } from "react";

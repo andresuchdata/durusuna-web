@@ -65,3 +65,13 @@ export async function generatePresignedUrls(
   });
   return data;
 }
+
+export async function createConversation(params: {
+  type: 'direct' | 'group';
+  participant_ids: string[];
+  name?: string;
+  description?: string;
+}): Promise<Conversation> {
+  const { data } = await http().post('/conversations', params);
+  return data.conversation;
+}

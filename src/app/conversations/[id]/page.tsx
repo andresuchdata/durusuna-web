@@ -9,7 +9,7 @@ import { GroupDetailDialog } from "@/domains/chat/components/GroupDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useChatRealtime } from "@/domains/chat/realtime";
 import { X, Send, Paperclip, ArrowLeft, Search, MoreVertical } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,6 +20,7 @@ import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
 import AppLayout from "@/components/layout/AppLayout";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { Menu } from "lucide-react";
+import { getSocket } from "@/core/realtime/socket";
 
 export default function ChatDetailPage() {
   const params = useParams<{ id: string }>();
@@ -55,55 +56,125 @@ export default function ChatDetailPage() {
   // Find current conversation
   const conversation = conversations?.find(c => c.id === conversationId);
 
+  // Memoize realtime handlers to prevent re-subscribing
+  const handleMessageNew = useCallback(() => {
+    console.log('[Page] New message received, will scroll to bottom');
+    // Message will be added via the hook, scroll after state updates
+    setTimeout(() => {
+      console.log('[Page] Scrolling to bottom');
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 200);
+  }, []);
+
+  const handleTypingStart = useCallback((userId: string) => {
+    console.log('[Page] Typing start received:', { userId, me, isSame: userId === me });
+    // Only show typing if it's not me
+    if (userId !== me) {
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev).add(userId);
+        console.log('[Page] Added typing user, total:', newSet.size);
+        return newSet;
+      });
+      setTheirTyping(true);
+    }
+  }, [me]);
+
+  const handleTypingStop = useCallback((userId: string) => {
+    console.log('[Page] Typing stop received:', { userId, me });
+    if (userId !== me) {
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        console.log('[Page] Removed typing user, remaining:', newSet.size);
+        return newSet;
+      });
+      // Update typing state based on remaining users
+      setTimeout(() => {
+        setTypingUsers((current) => {
+          const stillTyping = current.size > 0;
+          console.log('[Page] Updating theirTyping to:', stillTyping);
+          setTheirTyping(stillTyping);
+          return current;
+        });
+      }, 0);
+    }
+  }, [me]);
+
   // realtime typing indicator and messages
   useChatRealtime(conversationId, {
-    onMessageNew: (newMessage) => {
-      // Message will be added via the hook, but we need to scroll
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    },
-    onTypingStart: (userId) => {
-      // Only show typing if it's not me
-      if (userId !== me) {
-        setTypingUsers((prev) => new Set(prev).add(userId));
-        setTheirTyping(true);
-      }
-    },
-    onTypingStop: (userId) => {
-      if (userId !== me) {
-        setTypingUsers((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(userId);
-          return newSet;
-        });
-        // Update typing state based on remaining users
-        setTimeout(() => {
-          setTypingUsers((current) => {
-            setTheirTyping(current.size > 0);
-            return current;
-          });
-        }, 0);
-      }
-    },
+    onMessageNew: handleMessageNew,
+    onTypingStart: handleTypingStart,
+    onTypingStop: handleTypingStop,
   });
+
+  // Debug: Log isTyping state changes
+  useEffect(() => {
+    console.log('[Page] isTyping state changed to:', isTyping);
+  }, [isTyping]);
+
+  // Debug: Test socket on mount
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    console.log('[Page] Component mounted, testing socket...');
+    const socket = getSocket();
+    console.log('[Page] Socket status:', {
+      connected: socket.connected,
+      id: socket.id,
+      conversationId: conversationId
+    });
+    
+    // Test emit after 2 seconds
+    setTimeout(() => {
+      console.log('[Page] TEST: Manually emitting typing:start');
+      socket.emit("typing:start", { conversationId });
+      console.log('[Page] TEST: Emitted!');
+    }, 2000);
+  }, [conversationId]);
 
   // emit typing events with debounce
   useEffect(() => {
-    if (!isTyping || !conversationId) return;
+    console.log('[Page] Typing effect triggered', { isTyping, conversationId });
+    if (!isTyping || !conversationId) {
+      console.log('[Page] Skipping typing emit - isTyping:', isTyping, 'conversationId:', conversationId);
+      return;
+    }
     
+    console.log('[Page] About to emit typing:start');
     // Import socket dynamically
     import("@/core/realtime/socket").then(({ getSocket }) => {
       const socket = getSocket();
-      socket.emit("typing:start", { conversationId });
+      console.log('[Page] Socket obtained', { 
+        conversationId, 
+        socketId: socket.id,
+        connected: socket.connected 
+      });
+      
+      const emitTypingStart = () => {
+        console.log('[Page] Emitting typing:start NOW', { conversationId });
+        socket.emit("typing:start", { conversationId });
+      };
+      
+      if (socket.connected) {
+        emitTypingStart();
+      } else {
+        console.log('[Page] Socket not connected yet, waiting...');
+        socket.once('connect', emitTypingStart);
+      }
       
       // Auto stop after 3 seconds
       const stopTimeout = setTimeout(() => {
-        socket.emit("typing:stop", { conversationId });
+        console.log('[Page] Auto-emitting typing:stop after 3s', { conversationId });
+        if (socket.connected) {
+          socket.emit("typing:stop", { conversationId });
+        }
         setIsTyping(false);
       }, 3000);
       
-      return () => clearTimeout(stopTimeout);
+      return () => {
+        clearTimeout(stopTimeout);
+        socket.off('connect', emitTypingStart);
+      };
     });
   }, [isTyping, conversationId]);
 
@@ -113,7 +184,10 @@ export default function ChatDetailPage() {
       if (conversationId) {
         import("@/core/realtime/socket").then(({ getSocket }) => {
           const socket = getSocket();
-          socket.emit("typing:stop", { conversationId });
+          console.log('[Page] Emitting typing:stop on unmount', { conversationId });
+          if (socket.connected) {
+            socket.emit("typing:stop", { conversationId });
+          }
         });
       }
     };
@@ -122,9 +196,23 @@ export default function ChatDetailPage() {
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (items.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Use setTimeout to ensure DOM has updated
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [items.length]);
+
+  // Also scroll when items array reference changes (for realtime messages)
+  useEffect(() => {
+    if (items.length > 0) {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [items]);
 
   async function onSend(e: React.FormEvent) {
     e.preventDefault();
@@ -258,8 +346,8 @@ export default function ChatDetailPage() {
   return (
     <AppLayout hideBottomNav>
       <div className="flex flex-col h-screen">
-      {/* Header - Fixed */}
-      <div className="px-3 md:px-4 py-3 bg-white dark:bg-[#134e3a] border-b border-border flex items-center gap-2 md:gap-3 shadow-sm">
+      {/* Header - Sticky */}
+      <div className="sticky top-0 z-10 px-3 md:px-4 py-3 bg-white dark:bg-[#134e3a] border-b border-border flex items-center gap-2 md:gap-3 shadow-sm">
         {/* Back button - mobile only */}
         <Button
           variant="ghost"
@@ -389,7 +477,7 @@ export default function ChatDetailPage() {
       </div>
 
       {/* Composer - Fixed, above mobile nav */}
-      <div className="border-t bg-white dark:bg-[#134e3a] shadow-lg pb-safe">
+      <div className="border-t bg-white dark:bg-[#134e3a] shadow-lg pb-[calc(env(safe-area-inset-bottom)+12px)] md:pb-0">
         {/* Reply preview - WhatsApp style */}
         <AnimatePresence>
           {replyTo && (
@@ -468,15 +556,34 @@ export default function ChatDetailPage() {
             <Paperclip className="h-5 w-5" />
           </Button>
 
-          <Input
+          <input
             ref={inputRef}
             value={text}
             onChange={(e) => {
-              setText(e.target.value);
-              setIsTyping(true);
+              const newValue = e.target.value;
+              console.log('[Input] Text changed, value:', newValue);
+              setText(newValue);
+              
+              // Emit typing event DIRECTLY here instead of relying on useEffect
+              if (!isTyping && conversationId) {
+                console.log('[Input] Emitting typing:start DIRECTLY from onChange');
+                setIsTyping(true);
+                
+                const socket = getSocket();
+                if (socket.connected) {
+                  console.log('[Input] Socket connected, emitting now');
+                  socket.emit("typing:start", { conversationId });
+                } else {
+                  console.log('[Input] Socket not connected, waiting...');
+                  socket.once('connect', () => {
+                    console.log('[Input] Socket connected, emitting now');
+                    socket.emit("typing:start", { conversationId });
+                  });
+                }
+              }
             }}
             placeholder="Type a message"
-            className="flex-1 bg-background rounded-full"
+            className="flex-1 bg-background rounded-full px-4 py-2 border border-input focus:outline-none focus:ring-2 focus:ring-emerald-600"
             disabled={mediaUpload.isUploading}
           />
 

@@ -36,9 +36,23 @@ export function getSocket() {
     reconnectionDelayMax: 5000,
   });
 
-  socket.on("connect", () => setStatus("connected"));
-  socket.on("disconnect", () => setStatus("disconnected"));
-  socket.on("connect_error", () => setStatus("disconnected"));
+  socket.on("connect", () => {
+    console.log('[Socket] Connected to server');
+    setStatus("connected");
+  });
+  socket.on("disconnect", () => {
+    console.log('[Socket] Disconnected from server');
+    setStatus("disconnected");
+  });
+  socket.on("connect_error", (err) => {
+    console.log('[Socket] Connection error:', err);
+    setStatus("disconnected");
+  });
+
+  // Debug: Log all incoming events
+  socket.onAny((event, ...args) => {
+    console.log('[Socket] Received event:', event, args);
+  });
 
   return socket;
 }

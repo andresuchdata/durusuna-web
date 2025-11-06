@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getConversations, getConversationMessages, sendMessage } from "./api";
+import { getConversations, getConversationMessages, sendMessage, createConversation } from "./api";
 import type { Conversation, Message } from "./types";
 import { useChatRealtime } from "./realtime";
 
@@ -55,13 +55,35 @@ export function useConversationMessages(conversationId: string) {
   // realtime add
   useChatRealtime(conversationId, {
     onMessageNew(m) {
-      if (m.conversationId !== conversationId) return;
+      const msgConvId = m.conversationId || m.conversation_id;
+      console.log('[Hooks] Received new message', { msgConvId, conversationId, message: m });
+      
+      if (msgConvId !== conversationId) {
+        console.log('[Hooks] Message not for this conversation, skipping');
+        return;
+      }
+      
       // Append new message at the end
-      setAllMessages((prev) => [...prev, m]);
+      console.log('[Hooks] Adding message to state');
+      setAllMessages((prev) => {
+        // Check if message already exists
+        const exists = prev.some(msg => msg.id === m.id);
+        if (exists) {
+          console.log('[Hooks] Message already exists, skipping');
+          return prev;
+        }
+        console.log('[Hooks] Message added!');
+        return [...prev, m];
+      });
+      
       // Also update query cache
       qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
         ["chat", "messages", conversationId, "initial"],
-        (old) => ({ items: [...(old?.items ?? []), m], nextCursor: old?.nextCursor ?? null })
+        (old) => {
+          const exists = old?.items?.some(msg => msg.id === m.id);
+          if (exists) return old;
+          return { items: [...(old?.items ?? []), m], nextCursor: old?.nextCursor ?? null };
+        }
       );
     },
   });
@@ -91,6 +113,21 @@ export function useSendMessage(conversationId: string) {
       qc.invalidateQueries({ queryKey: ["chat", "messages", conversationId] });
       qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
       return m;
+    },
+  });
+}
+
+export function useCreateConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      type: 'direct' | 'group';
+      participant_ids: string[];
+      name?: string;
+      description?: string;
+    }) => createConversation(params),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
     },
   });
 }

@@ -4,7 +4,7 @@ import type { Conversation } from "../types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 
-export function ConversationItem({ c, isSelected }: { c: Conversation; isSelected?: boolean }) {
+export function ConversationItem({ c, isSelected, isTyping }: { c: Conversation; isSelected?: boolean; isTyping?: boolean }) {
   // For direct chats, use other_user's name
   let title = "Conversation";
   let avatarUrl = c.avatar_url;
@@ -18,7 +18,8 @@ export function ConversationItem({ c, isSelected }: { c: Conversation; isSelecte
     title = c.participants.map((p) => p.first_name || p.name).filter(Boolean).join(", ");
   }
   
-  const last = c.last_message?.text ?? "No messages yet";
+  // Handle both 'text' and 'content' fields for last message
+  const last = c.last_message?.text || c.last_message?.content || "No messages yet";
   const initials = title
     .split(" ")
     .map((w) => w[0])
@@ -50,7 +51,13 @@ export function ConversationItem({ c, isSelected }: { c: Conversation; isSelecte
             )}
           </div>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground truncate flex-1">{last}</p>
+            {isTyping ? (
+              <p className="text-sm text-emerald-600 dark:text-emerald-400 italic truncate flex-1">
+                typing...
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground truncate flex-1">{last}</p>
+            )}
             {c.unread_count && c.unread_count > 0 ? (
               <span className="ml-2 rounded-full bg-emerald-600 text-white text-xs px-2 py-0.5 font-medium flex-shrink-0">
                 {c.unread_count}
