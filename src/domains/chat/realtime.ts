@@ -6,6 +6,18 @@ import type { Message } from "./types";
 
 // Transform backend message format to frontend format
 function transformMessage(backendMessage: any): Message {
+  // Explicitly handle reply_to to ensure it's properly preserved
+  let reply_to: Message['reply_to'] = undefined;
+  if (backendMessage.reply_to) {
+    reply_to = {
+      id: backendMessage.reply_to.id,
+      content: backendMessage.reply_to.content || '',
+      sender_name: backendMessage.reply_to.sender_name || '',
+      sender_id: backendMessage.reply_to.sender_id,
+      message_type: backendMessage.reply_to.message_type,
+    };
+  }
+
   return {
     id: backendMessage.id,
     serverId: backendMessage.id,
@@ -22,7 +34,9 @@ function transformMessage(backendMessage: any): Message {
     status: backendMessage.read_status === 'read' ? 'read' : 
             backendMessage.read_status === 'delivered' ? 'delivered' : 'sent',
     reactions: backendMessage.reactions || {},
-    reply_to: backendMessage.reply_to || undefined,
+    reply_to_id: backendMessage.reply_to_id, // Preserve reply_to_id for frontend population
+    reply_to: reply_to,
+    message_type: backendMessage.message_type, // Preserve message_type for populating reply_to
   };
 }
 
@@ -48,26 +62,19 @@ export function useChatRealtime(
     if (!conversationId) return;
     
     const socket = getSocket();
-    console.log('[Realtime] Socket connected:', socket.connected);
-    console.log('[Realtime] Socket ID:', socket.id);
-    console.log('[Realtime] Joining conversation:', conversationId);
     
     // Wait for socket to connect before joining room
     const joinRoom = () => {
-      console.log('[Realtime] Socket is connected, joining room');
       socket.emit("conversation:join", { conversationId });
-      console.log('[Realtime] Emitted conversation:join', { conversationId });
     };
     
     if (socket.connected) {
       joinRoom();
     } else {
-      console.log('[Realtime] Socket not connected, waiting for connection...');
       socket.once('connect', joinRoom);
     }
 
     function onMessageNew(data: any) {
-      console.log('[Realtime] Received message:new', data);
       const msgConvId = data?.conversationId || data?.conversation_id || data?.message?.conversation_id;
       if (msgConvId !== conversationId) {
         console.log('[Realtime] Message not for this conversation', { msgConvId, conversationId });
@@ -80,26 +87,22 @@ export function useChatRealtime(
         console.warn('[Realtime] No message in data');
         return;
       }
-      
+
       const transformedMessage = transformMessage(backendMessage);
-      console.log('[Realtime] Transformed message:', transformedMessage);
       handlersRef.current.onMessageNew?.(transformedMessage);
     }
 
     function onTypingStart(data: any) {
-      console.log('[Realtime] Received typing:start', data);
       if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
       handlersRef.current.onTypingStart?.(data?.userId || data?.user_id);
     }
 
     function onTypingStop(data: any) {
-      console.log('[Realtime] Received typing:stop', data);
       if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
       handlersRef.current.onTypingStop?.(data?.userId || data?.user_id);
     }
 
     function onReactionUpdate(data: any) {
-      console.log('[Realtime] Received message:reaction_updated', data);
       if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
       const messageId = data?.messageId || data?.message_id;
       const reactions = data?.reactions || {};
@@ -114,17 +117,14 @@ export function useChatRealtime(
     socket.on("message:reaction_updated", onReactionUpdate);
 
     return () => {
-      console.log('[Realtime] Leaving conversation:', conversationId);
       if (socket.connected) {
         socket.emit("conversation:leave", { conversationId });
-        console.log('[Realtime] Emitted conversation:leave', { conversationId });
       }
       socket.off("connect", joinRoom);
       socket.off("message:new", onMessageNew);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
       socket.off("message:reaction_updated", onReactionUpdate);
-      console.log('[Realtime] Removed event listeners for conversation:', conversationId);
     };
   }, [conversationId]);
 }

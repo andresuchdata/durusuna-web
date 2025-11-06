@@ -50,9 +50,13 @@ export type Message = {
   createdAt?: string;
   status?: "sent" | "delivered" | "read";
   reactions?: Record<string, string[]>; // emoji -> array of user IDs
+  reply_to_id?: string; // ID of the message being replied to
   reply_to?: {
     id: string;
-    content: string;
+    content?: string;
     sender_name: string;
+    sender_id?: string;
+    message_type?: string;
   };
+  message_type?: string; // For populating reply_to
 };

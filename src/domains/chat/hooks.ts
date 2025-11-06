@@ -62,43 +62,103 @@ export function useConversationMessages(conversationId: string) {
     }
   };
 
+  // Helper function to populate reply_to from reply_to_id using existing messages
+  const populateReplyTo = (message: Message, allMessages: Message[]): Message => {
+    // If reply_to already exists, use it
+    if (message.reply_to) {
+      return message;
+    }
+
+    // If we have reply_to_id but no reply_to object, look it up
+    const replyToId = message.reply_to_id;
+    if (replyToId) {
+      const originalMessage = allMessages.find(msg => msg.id === replyToId);
+      if (originalMessage) {
+        return {
+          ...message,
+          reply_to: {
+            id: originalMessage.id,
+            content: originalMessage.content || originalMessage.text || '',
+            sender_name: originalMessage.sender
+              ? `${originalMessage.sender.first_name} ${originalMessage.sender.last_name}`
+              : 'Unknown',
+            sender_id: originalMessage.sender_id || originalMessage.senderId,
+            message_type: originalMessage.message_type || 'text',
+          },
+        };
+      }
+    }
+
+    return message;
+  };
+
   // realtime add
   useChatRealtime(conversationId, {
     onMessageNew(m) {
       const msgConvId = m.conversationId || m.conversation_id;
-      console.log('[Hooks] Received new message', { msgConvId, conversationId, message: m });
       
       if (msgConvId !== conversationId) {
-        console.log('[Hooks] Message not for this conversation, skipping');
         return;
       }
       
-      // Append new message at the end
-      console.log('[Hooks] Adding message to state');
+      // Append new message at the end, or update if it already exists
       setAllMessages((prev) => {
+        // First, populate reply_to if we have reply_to_id
+        const messageWithReplyTo = populateReplyTo(m, prev);
+        
         // Check if message already exists
-        const exists = prev.some(msg => msg.id === m.id);
-        if (exists) {
-          console.log('[Hooks] Message already exists, skipping');
-          return prev;
+        const existingIndex = prev.findIndex(msg => msg.id === messageWithReplyTo.id);
+        if (existingIndex !== -1) {
+          // Merge existing message with new data (especially to get reply_to if it was missing)
+          const existing = prev[existingIndex];
+          const merged = {
+            ...existing,
+            ...messageWithReplyTo,
+            // Preserve existing data but prefer new data for reply_to
+            reply_to: messageWithReplyTo.reply_to || existing.reply_to,
+            // Merge other fields that might be updated
+            reactions: messageWithReplyTo.reactions || existing.reactions,
+            status: messageWithReplyTo.status || existing.status,
+          };
+
+          const updated = [...prev];
+          updated[existingIndex] = merged;
+
+          return updated;
         }
-        console.log('[Hooks] Message added!');
-        return [...prev, m];
+
+        return [...prev, messageWithReplyTo];
       });
       
       // Also update query cache
       qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
         ["chat", "messages", conversationId, "initial"],
         (old) => {
-          const exists = old?.items?.some(msg => msg.id === m.id);
-          if (exists) return old;
-          return { items: [...(old?.items ?? []), m], nextCursor: old?.nextCursor ?? null };
+          if (!old) return old;
+          
+          // Populate reply_to from existing messages in cache
+          const messageWithReplyTo = populateReplyTo(m, old.items);
+          
+          const existingIndex = old.items.findIndex(msg => msg.id === messageWithReplyTo.id);
+          if (existingIndex !== -1) {
+            // Merge existing message with new data
+            const existing = old.items[existingIndex];
+            const merged = {
+              ...existing,
+              ...messageWithReplyTo,
+              reply_to: messageWithReplyTo.reply_to || existing.reply_to,
+              reactions: messageWithReplyTo.reactions || existing.reactions,
+              status: messageWithReplyTo.status || existing.status,
+            };
+            const updated = [...old.items];
+            updated[existingIndex] = merged;
+            return { ...old, items: updated };
+          }
+          return { items: [...old.items, messageWithReplyTo], nextCursor: old.nextCursor ?? null };
         }
       );
     },
-    onReactionUpdate(messageId: string, reactions: Record<string, any>) {
-      console.log('[Hooks] Received reaction update', { messageId, reactions });
-      
+    onReactionUpdate(messageId: string, reactions: Record<string, string[]>) {
       // Update message in state
       setAllMessages((prev) => 
         prev.map((msg) => 
