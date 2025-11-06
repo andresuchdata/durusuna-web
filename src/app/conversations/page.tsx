@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
+import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu } from "lucide-react";
@@ -11,36 +12,65 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { getSocket } from "@/core/realtime/socket";
+import { Message } from "@/domains/chat/types";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
 import { AnimatePresence } from "framer-motion";
 
 export default function ChatsPage() {
-  const { data, isLoading, error, refetch } = useConversations();
+  const { data, isLoading, error } = useConversations();
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [typingInConversations, setTypingInConversations] = useState<Set<string>>(new Set());
   const selectedConversation = data?.find(c => c.id === selectedId);
   const { toggleMobileSidebar } = useSidebar();
 
-  // Listen for global typing events
+  // Join all conversation rooms on mount
   useEffect(() => {
-    const socket = getSocket();
+    if (!data || data.length === 0) return;
     
-    const handleTypingStart = (data: any) => {
+    const socket = getSocket();
+    console.log(`[ChatsPage] Joining ${data.length} conversation rooms`);
+    
+    // Join all conversation rooms to receive events
+    data.forEach(conversation => {
+      socket.emit("conversation:join", { conversationId: conversation.id });
+    });
+    
+    return () => {
+      // Leave all rooms on unmount
+      console.log(`[ChatsPage] Leaving ${data.length} conversation rooms`);
+      data.forEach(conversation => {
+        socket.emit("conversation:leave", { conversationId: conversation.id });
+      });
+    };
+  }, [data]);
+
+  // Store refs to prevent handler recreation
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  // Listen for global typing and message events
+  useEffect(() => {
+    console.log('[ChatsPage] ===== SETTING UP EVENT LISTENERS =====');
+    const socket = getSocket();
+    console.log('[ChatsPage] Using socket instance:', socket.id, 'connected:', socket.connected);
+    console.log('[ChatsPage] Socket object:', socket);
+    
+    const handleTypingStart = (data: { conversationId?: string; conversation_id?: string }) => {
       const convId = data?.conversationId || data?.conversation_id;
       if (convId) {
-        console.log('[ChatsPage] Typing started in conversation:', convId);
         setTypingInConversations(prev => {
           const next = new Set(prev);
           next.add(convId);
-          console.log('[ChatsPage] Current typing conversations:', Array.from(next));
           return next;
         });
         
         // Auto-clear after 3 seconds as fallback
         setTimeout(() => {
-          console.log('[ChatsPage] Auto-clearing typing for conversation:', convId);
           setTypingInConversations(prev => {
             const next = new Set(prev);
             next.delete(convId);
@@ -50,44 +80,49 @@ export default function ChatsPage() {
       }
     };
     
-    const handleTypingStop = (data: any) => {
+    const handleTypingStop = (data: { conversationId?: string; conversation_id?: string }) => {
       const convId = data?.conversationId || data?.conversation_id;
       if (convId) {
-        console.log('[ChatsPage] Typing stopped in conversation:', convId);
         setTypingInConversations(prev => {
           const next = new Set(prev);
           next.delete(convId);
-          console.log('[ChatsPage] After stop, typing conversations:', Array.from(next));
           return next;
         });
       }
     };
     
-    const handleConversationCreated = (data: any) => {
-      console.log('[ChatsPage] New conversation created:', data);
-      refetch(); // Refetch conversation list
+    const handleConversationCreated = () => {
+      console.log('[ChatsPage] conversation:created event received');
+      queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
     };
     
-    const handleMessageNew = (data: any) => {
-      const convId = data?.conversationId || data?.conversation_id || data?.message?.conversation_id;
-      console.log('[ChatsPage] New message in conversation:', convId);
+    const handleMessageNew = (eventData: Message) => {
+      const convId = eventData?.conversationId || eventData?.conversation_id;
+      
       if (convId) {
-        refetch(); // Refetch to update unread counts and last message
+        queryClient.invalidateQueries({ 
+          queryKey: ["chat", "conversations"]
+        });
       }
     };
     
+    // Register event listeners
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
     socket.on('conversation:created', handleConversationCreated);
     socket.on('message:new', handleMessageNew);
     
+    console.log('[ChatsPage] ✅ All event listeners registered');
+    console.log('[ChatsPage] Socket listeners:', socket.listeners('message:new').length, 'for message:new');
+    
     return () => {
+      console.log('[ChatsPage] Cleaning up event listeners');
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
       socket.off('conversation:created', handleConversationCreated);
       socket.off('message:new', handleMessageNew);
     };
-  }, [refetch]);
+  }, [queryClient]);
 
   return (
     <AppLayout hideBottomNav={!!selectedId}>
@@ -144,7 +179,7 @@ export default function ChatsPage() {
             ) : error ? (
               <div className="p-4 text-center">
                 <p className="text-sm text-red-600 mb-2">Failed to load conversations</p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+                <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] })}>Retry</Button>
               </div>
             ) : data && data.length > 0 ? (
               <div>
@@ -273,6 +308,8 @@ export default function ChatsPage() {
 // Conversation Detail Component
 function ConversationDetail({ conversationId }: { conversationId: string }) {
   const { items, isLoading, error, hasMore, loadMore } = useConversationMessages(conversationId);
+  const { data: conversations } = useConversations();
+  const conversation = conversations?.find(c => c.id === conversationId);
   const { data: profile } = useProfile();
   const me = profile?.id ?? null;
   const [text, setText] = useState("");
@@ -284,27 +321,22 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 
   useChatRealtime(conversationId, {
     onMessageNew: () => {
-      console.log('[ConversationDetail] New message received, will scroll to bottom');
       // Message will be added via the hook, scroll after state updates
       setTimeout(() => {
-        console.log('[ConversationDetail] Scrolling to bottom');
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 200);
     },
     onTypingStart: (userId) => {
-      console.log('[ConversationDetail] Typing started by:', userId, 'me:', me);
       if (userId !== me) {
         setTheirTyping(true);
         
         // Auto-clear after 3.5 seconds as fallback
         setTimeout(() => {
-          console.log('[ConversationDetail] Auto-clearing typing indicator');
           setTheirTyping(false);
         }, 3500);
       }
     },
     onTypingStop: (userId) => {
-      console.log('[ConversationDetail] Typing stopped by:', userId, 'me:', me);
       if (userId !== me) {
         setTheirTyping(false);
       }
@@ -316,13 +348,11 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     if (!isTyping) return;
     
     const timer = setTimeout(() => {
-      console.log('[ConversationDetail] User stopped typing, emitting typing:stop');
       setIsTyping(false);
       
       const socket = getSocket();
       if (socket.connected && conversationId) {
         socket.emit("typing:stop", { conversationId });
-        console.log('[ConversationDetail] Emitted typing:stop');
       }
     }, 2000); // Stop after 2 seconds of no typing
     
@@ -374,7 +404,12 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
               </div>
             )}
             {items.map((msg) => (
-              <MessageItem key={msg.id} m={msg} me={me} />
+              <MessageItem 
+                key={msg.id} 
+                m={msg} 
+                me={me}
+                conversationType={conversation?.type}
+              />
             ))}
             
             {/* Typing indicator */}
@@ -396,22 +431,17 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
             value={text}
             onChange={(e) => {
               const newValue = e.target.value;
-              console.log('[ConversationDetail] Text changed, value:', newValue);
               setText(newValue);
               
               // Emit typing event DIRECTLY here
               if (!isTyping && conversationId) {
-                console.log('[ConversationDetail] Emitting typing:start DIRECTLY from onChange');
                 setIsTyping(true);
                 
                 const socket = getSocket();
                 if (socket.connected) {
-                  console.log('[ConversationDetail] Socket connected, emitting now');
                   socket.emit("typing:start", { conversationId });
                 } else {
-                  console.log('[ConversationDetail] Socket not connected, waiting...');
                   socket.once('connect', () => {
-                    console.log('[ConversationDetail] Socket connected, emitting now');
                     socket.emit("typing:start", { conversationId });
                   });
                 }
@@ -435,3 +465,4 @@ import { useConversationMessages, useSendMessage } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";
+

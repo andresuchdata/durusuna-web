@@ -22,7 +22,13 @@ export function onSocketStatus(cb: (s: SocketStatus) => void) {
 }
 
 export function getSocket() {
-  if (socket && socket.connected) return socket;
+  // Always return the same socket instance if it exists
+  if (socket) {
+    console.log('[Socket] Returning existing socket instance:', socket.id, 'connected:', socket.connected);
+    return socket;
+  }
+  
+  console.log('[Socket] Creating new socket instance');
   const token = tokenStore.access;
   setStatus("connecting");
   socket = io(env.SOCKET_URL, {
@@ -37,7 +43,7 @@ export function getSocket() {
   });
 
   socket.on("connect", () => {
-    console.log('[Socket] Connected to server');
+    console.log('[Socket] Connected to server, socket id:', socket?.id);
     setStatus("connected");
   });
   socket.on("disconnect", () => {
@@ -51,7 +57,7 @@ export function getSocket() {
 
   // Debug: Log all incoming events
   socket.onAny((event, ...args) => {
-    console.log('[Socket] Received event:', event, args);
+    console.log('[Socket] Received event:', event, 'on socket:', socket?.id, 'args:', args);
   });
 
   return socket;

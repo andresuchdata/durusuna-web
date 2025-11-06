@@ -10,7 +10,8 @@ export function useConversations() {
   return useQuery<Conversation[]>({
     queryKey: ["chat", "conversations"],
     queryFn: getConversations,
-    staleTime: 10_000,
+    staleTime: 5_000, // Reduced to 5 seconds for faster updates
+    refetchOnWindowFocus: true,
   });
 }
 

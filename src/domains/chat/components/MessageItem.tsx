@@ -17,9 +17,10 @@ interface MessageItemProps {
   onDelete?: (messageId: string) => void;
   onReact?: (messageId: string, emoji: string) => void;
   onAvatarClick?: (userId: string) => void;
+  conversationType?: "direct" | "group";
 }
 
-export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }: MessageItemProps) {
+export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, conversationType = "group" }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
@@ -92,8 +93,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }
       )}
 
       <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%]`}>
-        {/* Sender name for others' messages */}
-        {!isMine && (
+        {/* Sender name for others' messages (only in group chats) */}
+        {!isMine && conversationType === "group" && (
           <span className="text-xs text-muted-foreground mb-0.5 px-2">
             {senderName}
           </span>

@@ -7,7 +7,9 @@ export type Paginated<T> = {
 };
 
 export async function getConversations(): Promise<Conversation[]> {
+  console.log('[API] Fetching conversations...');
   const { data } = await http().get("/conversations");
+  console.log('[API] Conversations fetched:', data.conversations?.length || data.length, 'conversations');
   return data.conversations || data;
 }
 
