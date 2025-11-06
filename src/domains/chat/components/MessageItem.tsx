@@ -58,13 +58,28 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     setShowReactionPicker(false);
   };
 
-  // Count reactions
+  // Count reactions - handle both formats:
+  // Backend format: { emoji: { count: number, users: string[] } }
+  // Frontend format: { emoji: string[] } (array of user IDs)
   const reactionCounts = m.reactions
-    ? Object.entries(m.reactions).map(([emoji, userIds]) => ({
-        emoji,
-        count: userIds.length,
-        hasReacted: userIds.includes(me || "")
-      }))
+    ? Object.entries(m.reactions).map(([emoji, reactionData]) => {
+        // Check if it's backend format (object with count and users)
+        if (reactionData && typeof reactionData === 'object' && !Array.isArray(reactionData) && 'users' in reactionData && 'count' in reactionData) {
+          const backendFormat = reactionData as { count: number; users: string[] };
+          return {
+            emoji,
+            count: backendFormat.count || backendFormat.users?.length || 0,
+            hasReacted: backendFormat.users?.includes(me || "") || false
+          };
+        }
+        // Frontend format (array of user IDs)
+        const userIds = Array.isArray(reactionData) ? reactionData : [];
+        return {
+          emoji,
+          count: userIds.length,
+          hasReacted: userIds.includes(me || "")
+        };
+      })
     : [];
 
   const totalReactions = reactionCounts.reduce((sum, r) => sum + r.count, 0);

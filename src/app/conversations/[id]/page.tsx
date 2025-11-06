@@ -7,11 +7,12 @@ import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { UserDetailDialog } from "@/domains/chat/components/UserDetailDialog";
 import { GroupDetailDialog } from "@/domains/chat/components/GroupDetailDialog";
 import { ForwardMessageDialog } from "@/domains/chat/components/ForwardMessageDialog";
+import { EmojiPickerComponent } from "@/domains/chat/components/EmojiPicker";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useChatRealtime } from "@/domains/chat/realtime";
-import { X, Send, Paperclip, ArrowLeft, Search, MoreVertical, Image as ImageIcon, File, Video, Music } from "lucide-react";
+import { X, Send, Paperclip, ArrowLeft, Search, MoreVertical, Image as ImageIcon, File, Video, Music, Smile } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/domains/chat/types";
 import { useMediaUpload } from "@/shared/hooks/useMediaUpload";
@@ -41,6 +42,7 @@ export default function ChatDetailPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [forwardMessageId, setForwardMessageId] = useState<string | null>(null);
   const [showForwardDialog, setShowForwardDialog] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const { mutate: reactToMessage } = useToggleReaction(conversationId);
@@ -570,7 +572,7 @@ export default function ChatDetailPage() {
         )}
 
         {/* Input */}
-        <form onSubmit={onSend} className="p-3 md:p-4 flex items-end gap-2">
+        <form onSubmit={onSend} className="p-3 md:p-4 flex items-end gap-2 relative">
           <input
             ref={mediaUpload.fileInputRef}
             type="file"
@@ -579,6 +581,37 @@ export default function ChatDetailPage() {
             onChange={(e) => mediaUpload.handleFileSelect(e.target.files)}
             className="hidden"
           />
+          
+          {/* Emoji Button - Leftmost */}
+          <div className="relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowEmojiPicker(!showEmojiPicker);
+              }}
+              className="shrink-0 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50"
+            >
+              <Smile className="h-5 w-5" />
+            </Button>
+            
+            {/* Emoji Picker */}
+            <AnimatePresence>
+              {showEmojiPicker && (
+                <EmojiPickerComponent
+                  onSelectEmoji={(emoji) => {
+                    setText((prev) => prev + emoji);
+                    setShowEmojiPicker(false);
+                    inputRef.current?.focus();
+                  }}
+                  onClose={() => setShowEmojiPicker(false)}
+                  position="bottom"
+                />
+              )}
+            </AnimatePresence>
+          </div>
           
           <Button
             type="button"
@@ -612,6 +645,7 @@ export default function ChatDetailPage() {
                 }
               }
             }}
+            onFocus={() => setShowEmojiPicker(false)}
             placeholder="Type a message"
             className="flex-1 bg-background rounded-full px-4 py-2 border border-input focus:outline-none focus:ring-2 focus:ring-emerald-600"
             disabled={mediaUpload.isUploading}
