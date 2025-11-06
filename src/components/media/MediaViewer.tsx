@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
+import Image from "next/image";
 import { X, Download, ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, FileText, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -10,7 +11,7 @@ export interface MediaItem {
   id: string;
   name: string;
   url: string;
-  type: string;
+  type?: string;
   size?: number;
 }
 
@@ -45,16 +46,16 @@ export function MediaViewer({ items, initialIndex = 0, open, onOpenChange }: Med
     return null;
   }
 
-  const isImage = currentItem.type.startsWith('image/');
-  const isVideo = currentItem.type.startsWith('video/');
+  const isImage = currentItem.type?.startsWith('image/') ?? false;
+  const isVideo = currentItem.type?.startsWith('video/') ?? false;
   const isPDF = currentItem.type === 'application/pdf';
   const isDocument = 
-    currentItem.type.includes('word') || 
-    currentItem.type.includes('document') ||
-    currentItem.type.includes('spreadsheet') ||
-    currentItem.type.includes('presentation') ||
-    currentItem.type.includes('excel') ||
-    currentItem.type.includes('powerpoint');
+    currentItem.type?.includes('word') || 
+    currentItem.type?.includes('document') ||
+    currentItem.type?.includes('spreadsheet') ||
+    currentItem.type?.includes('presentation') ||
+    currentItem.type?.includes('excel') ||
+    currentItem.type?.includes('powerpoint');
 
   const handlePrevious = () => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : items.length - 1));
@@ -159,14 +160,24 @@ export function MediaViewer({ items, initialIndex = 0, open, onOpenChange }: Med
           {/* Content */}
           <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
             {isImage && (
-              <img
-                src={currentItem.url}
-                alt={currentItem.name}
-                className="max-w-full max-h-full object-contain transition-transform"
-                style={{
-                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-                }}
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <div
+                  className="relative transition-transform"
+                  style={{
+                    transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <Image
+                    src={currentItem.url}
+                    alt={currentItem.name}
+                    fill
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              </div>
             )}
 
             {isVideo && (
@@ -206,8 +217,8 @@ export function MediaViewer({ items, initialIndex = 0, open, onOpenChange }: Med
                     </Button>
                     <Button
                       onClick={() => window.open(currentItem.url, '_blank')}
-                      variant="outline"
-                      className="text-white border-white/20 hover:bg-white/10"
+                      variant="ghost"
+                      className="text-white border border-white/20 hover:bg-white/10 hover:text-white"
                     >
                       Open in New Tab
                     </Button>
@@ -274,13 +285,17 @@ export function MediaViewer({ items, initialIndex = 0, open, onOpenChange }: Med
                         : 'border-white/20 hover:border-white/40'
                     }`}
                   >
-                    {item.type.startsWith('image/') ? (
-                      <img
-                        src={item.url}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : item.type.startsWith('video/') ? (
+                    {item.type?.startsWith('image/') ? (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={item.url}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : item.type?.startsWith('video/') ? (
                       <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                         <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6 4l10 6-10 6V4z" />
@@ -315,13 +330,18 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
     const item = items[0];
     return (
       <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => onItemClick(0)}>
-        {item.type.startsWith('image/') ? (
-          <img
-            src={item.url}
-            alt={item.name}
-            className="w-full h-auto max-h-96 object-cover"
-          />
-        ) : item.type.startsWith('video/') ? (
+        {item.type?.startsWith('image/') ? (
+          <div className="relative w-full h-auto max-h-96">
+            <Image
+              src={item.url}
+              alt={item.name}
+              width={800}
+              height={600}
+              className="w-full h-auto max-h-96 object-cover"
+              unoptimized
+            />
+          </div>
+        ) : item.type?.startsWith('video/') ? (
           <div className="relative">
             <video src={item.url} className="w-full h-auto max-h-96 object-cover" />
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -354,13 +374,17 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
           onClick={() => onItemClick(index)}
           className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
         >
-          {item.type.startsWith('image/') ? (
-            <img
-              src={item.url}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          ) : item.type.startsWith('video/') ? (
+          {item.type?.startsWith('image/') ? (
+            <div className="relative w-full h-full">
+              <Image
+                src={item.url}
+                alt={item.name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          ) : item.type?.startsWith('video/') ? (
             <>
               <video src={item.url} className="w-full h-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/30">

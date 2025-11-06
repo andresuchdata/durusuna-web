@@ -179,9 +179,28 @@ export function ClassUpdateForm({
       });
       setFiles([]);
       onErrorsChange({});
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to upload files:', error);
-      onErrorsChange({ files: 'Failed to upload files. Please try again.' });
+      const err = error as { message?: string; response?: { data?: { message?: string }; status?: number }; code?: string };
+      const errorDetails = {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status,
+        code: err?.code,
+        isTimeout: err?.code === 'ECONNABORTED',
+      };
+      console.error('Error details:', JSON.stringify(errorDetails, null, 2));
+      
+      let errorMessage = 'Failed to upload files. Please try again.';
+      if (err?.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timed out. Please try with smaller files or check your connection.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      onErrorsChange({ files: errorMessage });
     } finally {
       onUploadingChange(false);
     }

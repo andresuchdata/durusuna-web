@@ -13,8 +13,11 @@ function createClient(): AxiosInstance {
   instance.interceptors.request.use((config) => {
     const token = tokenStore.access;
     if (token) {
-      config.headers = config.headers ?? {};
-      (config.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+      // Preserve existing headers, especially for FormData
+      if (!config.headers) {
+        config.headers = {} as any;
+      }
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   });

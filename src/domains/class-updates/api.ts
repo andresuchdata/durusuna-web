@@ -26,6 +26,19 @@ interface BackendAttachment {
   size: number;
 }
 
+// Flexible attachment type that accepts both frontend and backend formats
+export interface AttachmentInput {
+  id: string;
+  name?: string;
+  originalName?: string;
+  fileName?: string;
+  url: string;
+  type?: string;
+  mimeType?: string;
+  size: number;
+  key?: string;
+}
+
 interface BackendAuthor {
   id: string;
   first_name: string;
@@ -143,7 +156,7 @@ export async function getClassUpdates(filters?: ClassUpdateFilters): Promise<Cla
         id: att.id,
         name: att.originalName || att.fileName,
         url: att.url,
-        type: att.mimeType,
+        type: att.mimeType || 'application/octet-stream',
         size: att.size,
       })),
     };
@@ -229,17 +242,28 @@ export interface CreateClassUpdateData {
   content: string;
   update_type?: 'announcement' | 'homework' | 'reminder' | 'event';
   is_pinned?: boolean;
-  attachments?: BackendAttachment[];
+  attachments?: AttachmentInput[];
 }
 
 export async function createClassUpdate(data: CreateClassUpdateData): Promise<ClassUpdate> {
+  // Transform attachments to backend format
+  const backendAttachments = data.attachments?.map(att => ({
+    id: att.id,
+    originalName: att.originalName || att.name || att.fileName || 'unknown',
+    fileName: att.fileName || att.name || 'unknown',
+    mimeType: att.mimeType || att.type || 'application/octet-stream',
+    size: att.size,
+    url: att.url,
+    key: att.key,
+  }));
+  
   const { data: response } = await axiosInstance.post(`/classes/${data.class_id}/updates`, {
     class_id: data.class_id, // Required by validation schema
     title: data.title,
     content: data.content,
     update_type: data.update_type || 'announcement',
     is_pinned: data.is_pinned || false,
-    attachments: data.attachments || [],
+    attachments: backendAttachments || [],
   });
   
   const update = response.update;
@@ -282,27 +306,78 @@ export async function createClassUpdate(data: CreateClassUpdateData): Promise<Cl
       id: att.id,
       name: att.originalName || att.fileName,
       url: att.url,
-      type: att.mimeType,
+      type: att.mimeType || 'application/octet-stream',
       size: att.size,
     })),
   };
 }
 
 export async function uploadAttachments(classId: string, files: File[]): Promise<BackendAttachment[]> {
-  const formData = new FormData();
-  formData.append('class_id', classId);
+  const startTime = Date.now();
   
-  files.forEach((file) => {
-    formData.append('attachments', file);
-  });
-  
-  const { data } = await axiosInstance.post('/class-updates/upload-attachments', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  
-  return data.attachments;
+  try {
+    // Step 1: Get presigned URLs from backend
+    const filesInfo = files.map(f => ({
+      name: f.name,
+      type: f.type,
+      size: f.size
+    }));
+    
+    const { data: urlsData } = await axiosInstance.post('/class-updates/generate-presigned-urls', {
+      class_id: classId,
+      files: filesInfo,
+    });
+    
+    console.log(`Got ${urlsData.urls.length} presigned URLs`);
+    
+    // Step 2: Upload each file directly to S3/R2
+    console.log('Step 2: Uploading files directly to R2...');
+    const uploadPromises = urlsData.urls.map(async (urlInfo: {
+      id: string;
+      uploadUrl: string;
+      publicUrl: string;
+      key: string;
+      fileName: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+    }, index: number) => {
+      const file = files[index];
+      console.log(`Uploading ${file.name} to R2...`);
+      
+      const uploadResponse = await fetch(urlInfo.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload ${file.name}: ${uploadResponse.statusText}`);
+      }
+      
+      // Return the attachment info in the format expected by the frontend
+      return {
+        id: urlInfo.id,
+        name: urlInfo.originalName, // Use 'name' to match existing attachments format
+        url: urlInfo.publicUrl,
+        type: urlInfo.mimeType,     // Use 'type' to match existing attachments format
+        size: urlInfo.size,
+        // Also include backend fields for compatibility
+        fileName: urlInfo.fileName,
+        originalName: urlInfo.originalName,
+        mimeType: urlInfo.mimeType,
+        key: urlInfo.key,
+      };
+    });
+    
+    const attachments = await Promise.all(uploadPromises);
+    
+    return attachments;
+  } catch (error: unknown) {
+    throw error;
+  }
 }
 
 export async function updateClassUpdate(
@@ -311,10 +386,24 @@ export async function updateClassUpdate(
     title?: string;
     content?: string;
     update_type?: 'announcement' | 'homework' | 'reminder' | 'event';
-    attachments?: BackendAttachment[];
+    attachments?: AttachmentInput[];
   }
 ): Promise<ClassUpdate> {
-  const { data: response } = await axiosInstance.put(`/class-updates/${updateId}`, data);
+  // Transform attachments to backend format
+  const backendData = {
+    ...data,
+    attachments: data.attachments?.map(att => ({
+      id: att.id,
+      originalName: att.originalName || att.name || att.fileName || 'unknown',
+      fileName: att.fileName || att.name || 'unknown',
+      mimeType: att.mimeType || att.type || 'application/octet-stream',
+      size: att.size,
+      url: att.url,
+      key: att.key,
+    })),
+  };
+  
+  const { data: response } = await axiosInstance.put(`/class-updates/${updateId}`, backendData);
   const update = response.update;
   
   // Transform backend response to match frontend types (same as getClassUpdates)
@@ -356,7 +445,7 @@ export async function updateClassUpdate(
       id: att.id,
       name: att.originalName || att.fileName,
       url: att.url,
-      type: att.mimeType,
+      type: att.mimeType || 'application/octet-stream',
       size: att.size,
     })),
   };
