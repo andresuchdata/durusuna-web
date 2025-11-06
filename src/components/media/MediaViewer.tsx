@@ -367,8 +367,8 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
   }
 
   return (
-    <div className={`grid gap-1 ${items.length === 2 ? 'grid-cols-2' : items.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-      {items.slice(0, 4).map((item, index) => (
+    <div className={`grid gap-1 ${items.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      {items.slice(0, 3).map((item, index) => (
         <div
           key={item.id}
           onClick={() => onItemClick(index)}
@@ -401,9 +401,9 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
             </div>
           )}
           
-          {index === 3 && items.length > 4 && (
+          {index === 2 && items.length > 3 && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">+{items.length - 4}</span>
+              <span className="text-white text-2xl font-bold">+{items.length - 3}</span>
             </div>
           )}
         </div>

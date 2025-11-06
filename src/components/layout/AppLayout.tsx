@@ -7,6 +7,7 @@ import { MessageSquare, BookOpen, User, LogOut, Menu, X, Users, ClipboardCheck, 
 import { tokenStore } from "@/core/auth/token";
 import { useEffect, useState } from "react";
 import { TopHeader } from "./TopHeader";
+import { useSidebar } from "@/contexts/SidebarContext";
 import {
   Tooltip,
   TooltipContent,
@@ -14,17 +15,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children, hideBottomNav = false }: { children: React.ReactNode; hideBottomNav?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: profile, isLoading } = useProfile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-
-  const toggleMobileSidebar = () => {
-    setMobileSidebarOpen(!mobileSidebarOpen);
-  };
+  const { mobileSidebarOpen, setMobileSidebarOpen, toggleMobileSidebar } = useSidebar();
 
   useEffect(() => {
     // This is intentional for handling Next.js hydration
@@ -75,27 +72,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onToggleMobileSidebar={toggleMobileSidebar}
       />
       <div className={`flex flex-1 flex-col md:flex-row ${isConversationsPage ? '' : 'md:pt-12'}`}>
-        {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50">
-          <div className="flex justify-around items-center h-16">
-            {navItems.slice(0, 5).map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <button
-                  key={item.href}
-                  onClick={() => router.push(item.href)}
-                  className={`flex flex-col items-center justify-center flex-1 h-full ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-xs mt-1">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+        {/* Mobile bottom nav - can be hidden */}
+        {!hideBottomNav && (
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50">
+            <div className="flex justify-around items-center h-16">
+              {navItems.slice(0, 5).map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname.startsWith(item.href);
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => router.push(item.href)}
+                    className={`flex flex-col items-center justify-center flex-1 h-full ${
+                      isActive ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs mt-1">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        )}
 
         {/* Desktop sidebar */}
         <aside className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 bg-[#1e3a5f] text-white border-r border-[#2c4f7c] transition-all duration-300 z-50 ${sidebarCollapsed ? 'md:w-16' : 'md:w-48'}`}>
@@ -228,7 +227,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main content */}
-        <main className={`flex-1 transition-all duration-300 pb-16 md:pb-0 ${isConversationsPage ? '' : 'pt-12 md:pt-0'} ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-48'}`}>
+        <main className={`flex-1 transition-all duration-300 ${hideBottomNav ? 'pb-0' : 'pb-16 md:pb-0'} ${isConversationsPage ? '' : 'pt-12 md:pt-0'} ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-48'}`}>
           {children}
         </main>
       </div>

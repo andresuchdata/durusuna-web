@@ -7,6 +7,8 @@ import { useState } from "react";
 import { MessageActions } from "./MessageActions";
 import { ReactionPicker } from "./ReactionPicker";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MediaThumbnailGrid, MediaViewer } from "@/components/media/MediaViewer";
+import type { MediaItem } from "@/components/media/MediaViewer";
 
 interface MessageItemProps {
   m: Message;
@@ -20,6 +22,8 @@ interface MessageItemProps {
 export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
+  const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
   
   const senderId = m.sender_id || m.senderId || m.sender?.id;
   const isMine = senderId === me;
@@ -33,6 +37,14 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }
   const senderInitials = m.sender
     ? `${m.sender.first_name[0]}${m.sender.last_name[0]}`
     : "?";
+
+  // Transform attachments to MediaItem format
+  const mediaItems: MediaItem[] = (m.attachments || []).map((att) => ({
+    id: att.id,
+    name: att.type?.split('/').pop() || 'file',
+    url: att.url,
+    type: att.type,
+  }));
 
   const handleCopy = () => {
     navigator.clipboard.writeText(messageText);
@@ -103,13 +115,28 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }
 
           {/* Main message */}
           <div
-            className={`rounded-2xl px-4 py-2 shadow-sm ${
+            className={`rounded-2xl shadow-sm ${
               isMine
                 ? "bg-emerald-600 text-white rounded-br-sm"
                 : "bg-white dark:bg-[#134e3a] text-foreground dark:text-white rounded-bl-sm"
-            }`}
+            } ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}`}
           >
-            <p className="text-sm break-words whitespace-pre-wrap">{messageText}</p>
+            {/* Media attachments */}
+            {mediaItems.length > 0 && (
+              <div className="mb-2">
+                <MediaThumbnailGrid
+                  items={mediaItems}
+                  onItemClick={(index) => {
+                    setMediaViewerIndex(index);
+                    setMediaViewerOpen(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {messageText && (
+              <p className="text-sm break-words whitespace-pre-wrap">{messageText}</p>
+            )}
             
             <div className="flex items-center justify-end gap-1 mt-1">
               <span className={`text-[10px] ${isMine ? 'text-emerald-100' : 'text-muted-foreground'}`}>
@@ -187,6 +214,16 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick }
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Media Viewer */}
+      {mediaItems.length > 0 && (
+        <MediaViewer
+          items={mediaItems}
+          initialIndex={mediaViewerIndex}
+          open={mediaViewerOpen}
+          onOpenChange={setMediaViewerOpen}
+        />
+      )}
     </motion.div>
   );
 }

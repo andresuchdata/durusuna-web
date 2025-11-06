@@ -6,18 +6,20 @@ import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 export default function ChatsPage() {
   const { data, isLoading, error, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedConversation = data?.find(c => c.id === selectedId);
+  const { toggleMobileSidebar } = useSidebar();
 
   return (
-    <AppLayout>
-      <div className="flex h-screen">
+    <AppLayout hideBottomNav={!!selectedId}>
+      <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'}`}>
         {/* Conversations List */}
         <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
           {/* WhatsApp-style Header */}
@@ -88,52 +90,66 @@ export default function ChatsPage() {
           {selectedId && selectedConversation ? (
             <>
               {/* WhatsApp-style Conversation Header */}
-              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-4 py-2 flex items-center justify-between border-b border-border dark:border-[#2a3942]">
-                <div className="flex items-center gap-3">
-                  {/* Back button for mobile */}
+              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942]">
+                {/* Back button for mobile */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="md:hidden h-9 w-9 p-0 shrink-0" 
+                  onClick={() => setSelectedId(null)}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                
+                <Avatar className="h-9 w-9 md:h-10 md:w-10 shrink-0">
+                  <AvatarImage src={
+                    (selectedConversation.type === 'direct' && selectedConversation.other_user
+                      ? selectedConversation.other_user.avatar_url
+                      : selectedConversation.avatar_url) || undefined
+                  } />
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                    {(() => {
+                      if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
+                        return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
+                      }
+                      return (selectedConversation.name || 'C').charAt(0).toUpperCase();
+                    })()}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-sm md:text-base truncate">
+                    {selectedConversation.type === 'direct' && selectedConversation.other_user
+                      ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
+                      : selectedConversation.name || 'Conversation'}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">online</p>
+                </div>
+                
+                <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                  {/* Hide video/phone on mobile */}
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0">
+                    <Video className="h-5 w-5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0">
+                    <Phone className="h-5 w-5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                    <Search className="h-5 w-5" />
+                  </Button>
+                  
+                  {/* Hamburger menu - mobile only */}
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="md:hidden h-10 w-10 p-0 mr-1" 
-                    onClick={() => setSelectedId(null)}
+                    className="md:hidden h-9 w-9 p-0"
+                    onClick={toggleMobileSidebar}
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <Menu className="h-5 w-5" />
                   </Button>
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={
-                      (selectedConversation.type === 'direct' && selectedConversation.other_user
-                        ? selectedConversation.other_user.avatar_url
-                        : selectedConversation.avatar_url) || undefined
-                    } />
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      {(() => {
-                        if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
-                          return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
-                        }
-                        return (selectedConversation.name || 'C').charAt(0).toUpperCase();
-                      })()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="font-semibold text-base">
-                      {selectedConversation.type === 'direct' && selectedConversation.other_user
-                        ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
-                        : selectedConversation.name || 'Conversation'}
-                    </h2>
-                    <p className="text-xs text-muted-foreground">online</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
-                    <Video className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
-                    <Phone className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
-                    <Search className="h-5 w-5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
+                  
+                  {/* More menu - desktop only */}
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-9 w-9 p-0">
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </div>
@@ -199,7 +215,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   return (
     <div className="flex flex-col h-full w-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a]">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a]">
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading messages…</div>
         ) : error ? (
@@ -218,8 +234,8 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         )}
       </div>
 
-      {/* Composer */}
-      <div className="p-4 bg-white dark:bg-card border-t border-border">
+      {/* Composer - Above mobile nav */}
+      <div className="p-3 md:p-4 bg-white dark:bg-card border-t border-border pb-safe">
         <form onSubmit={onSend} className="flex gap-2">
           <Input
             ref={inputRef}
@@ -231,7 +247,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
             placeholder="Type a message"
             className="flex-1 bg-background"
           />
-          <Button type="submit" disabled={isPending || !text.trim()} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button type="submit" disabled={isPending || !text.trim()} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
             Send
           </Button>
         </form>

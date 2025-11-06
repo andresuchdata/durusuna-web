@@ -397,12 +397,6 @@ function ClassUpdateCard({ update, onUpdate }: { update: ClassUpdate; onUpdate?:
     size: att.size,
   })) || [];
   
-  // Debug: Log attachments to console
-  if (update.attachments && update.attachments.length > 0) {
-    console.log('Update attachments:', update.attachments);
-    console.log('Media items:', mediaItems);
-  }
-  
   const commentCount = update.comments?.length || 0;
   
   // Group reactions by emoji

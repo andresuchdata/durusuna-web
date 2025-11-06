@@ -16,39 +16,76 @@ export function useConversations() {
 
 export function useConversationMessages(conversationId: string) {
   const qc = useQueryClient();
+  const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  
   const { data, isLoading, error } = useQuery<{ items: Message[]; nextCursor?: string | null }>({
-    queryKey: ["chat", "messages", conversationId, cursor ?? "initial"],
-    queryFn: () => getConversationMessages(conversationId, cursor),
+    queryKey: ["chat", "messages", conversationId, "initial"],
+    queryFn: () => getConversationMessages(conversationId, undefined),
+    staleTime: 10_000,
   });
 
-  const items = data?.items ?? [];
-  const nextCursor = data?.nextCursor ?? null;
+  // Initialize messages from initial query
+  useEffect(() => {
+    if (data?.items) {
+      setAllMessages(data.items);
+      setNextCursor(data.nextCursor ?? null);
+    }
+  }, [data]);
+
+  // Load more handler
+  const loadMore = async () => {
+    if (!nextCursor || isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const result = await getConversationMessages(conversationId, nextCursor);
+      // Prepend older messages
+      setAllMessages((prev) => [...result.items, ...prev]);
+      setNextCursor(result.nextCursor ?? null);
+    } catch (err) {
+      console.error('Failed to load more messages:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   // realtime add
   useChatRealtime(conversationId, {
     onMessageNew(m) {
       if (m.conversationId !== conversationId) return;
+      // Append new message at the end
+      setAllMessages((prev) => [...prev, m]);
+      // Also update query cache
       qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
-        ["chat", "messages", conversationId, cursor ?? "initial"],
+        ["chat", "messages", conversationId, "initial"],
         (old) => ({ items: [...(old?.items ?? []), m], nextCursor: old?.nextCursor ?? null })
       );
     },
   });
 
   return {
-    items,
-    isLoading,
+    items: allMessages,
+    isLoading: isLoading || isLoadingMore,
     error,
     hasMore: !!nextCursor,
-    loadMore: () => setCursor(nextCursor ?? undefined),
+    loadMore,
   };
 }
 
 export function useSendMessage(conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { text: string }) => sendMessage(conversationId, payload.text),
+    mutationFn: (payload: { 
+      text: string; 
+      replyTo?: string;
+      attachments?: Array<{ id: string; url: string; type: string; name: string; size: number }>;
+    }) => sendMessage(conversationId, payload.text, {
+      replyTo: payload.replyTo,
+      attachments: payload.attachments,
+    }),
     onSuccess: (m) => {
       // optimistic append handled by realtime too, but ensure UI updates
       qc.invalidateQueries({ queryKey: ["chat", "messages", conversationId] });

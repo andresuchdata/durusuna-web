@@ -26,11 +26,42 @@ export async function getConversationMessages(
   };
 }
 
-export async function sendMessage(conversationId: string, text: string): Promise<Message> {
+export async function sendMessage(
+  conversationId: string, 
+  text: string,
+  options?: {
+    replyTo?: string;
+    attachments?: Array<{ id: string; url: string; type: string; name: string; size: number }>;
+  }
+): Promise<Message> {
   const { data } = await http().post(`/conversations/${conversationId}/messages`, { 
     conversation_id: conversationId,
     content: text,
-    message_type: 'text'
+    message_type: options?.attachments && options.attachments.length > 0 ? 'media' : 'text',
+    reply_to: options?.replyTo,
+    attachments: options?.attachments,
   });
   return data.message || data;
+}
+
+export async function generatePresignedUrls(
+  conversationId: string,
+  files: Array<{ name: string; type: string; size: number }>
+): Promise<{
+  urls: Array<{
+    id: string;
+    uploadUrl: string;
+    publicUrl: string;
+    key: string;
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  }>;
+}> {
+  const { data } = await http().post('/conversations/generate-presigned-urls', {
+    conversation_id: conversationId,
+    files,
+  });
+  return data;
 }
