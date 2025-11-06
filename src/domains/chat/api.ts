@@ -80,4 +80,5 @@ export async function createConversation(params: {
 
 export async function markConversationAsRead(conversationId: string): Promise<void> {
   await http().put(`/conversations/${conversationId}/mark-read`);
+  console.log('[API] Marking conversation as read:', conversationId);
 }

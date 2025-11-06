@@ -147,8 +147,8 @@ export function useMarkConversationAsRead() {
             : conv
         );
       });
-      // Also invalidate to ensure fresh data
-      qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
+      // Don't invalidate immediately - let the caller control when to refetch
+      // to avoid race conditions with backend processing
     },
   });
 }

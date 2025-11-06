@@ -58,21 +58,17 @@ export default function ChatDetailPage() {
 
   // Memoize realtime handlers to prevent re-subscribing
   const handleMessageNew = useCallback(() => {
-    console.log('[Page] New message received, will scroll to bottom');
     // Message will be added via the hook, scroll after state updates
     setTimeout(() => {
-      console.log('[Page] Scrolling to bottom');
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 200);
   }, []);
 
   const handleTypingStart = useCallback((userId: string) => {
-    console.log('[Page] Typing start received:', { userId, me, isSame: userId === me });
     // Only show typing if it's not me
     if (userId !== me) {
       setTypingUsers((prev) => {
         const newSet = new Set(prev).add(userId);
-        console.log('[Page] Added typing user, total:', newSet.size);
         return newSet;
       });
       setTheirTyping(true);
@@ -80,19 +76,16 @@ export default function ChatDetailPage() {
   }, [me]);
 
   const handleTypingStop = useCallback((userId: string) => {
-    console.log('[Page] Typing stop received:', { userId, me });
     if (userId !== me) {
       setTypingUsers((prev) => {
         const newSet = new Set(prev);
         newSet.delete(userId);
-        console.log('[Page] Removed typing user, remaining:', newSet.size);
         return newSet;
       });
       // Update typing state based on remaining users
       setTimeout(() => {
         setTypingUsers((current) => {
           const stillTyping = current.size > 0;
-          console.log('[Page] Updating theirTyping to:', stillTyping);
           setTheirTyping(stillTyping);
           return current;
         });
@@ -109,62 +102,42 @@ export default function ChatDetailPage() {
 
   // Debug: Log isTyping state changes
   useEffect(() => {
-    console.log('[Page] isTyping state changed to:', isTyping);
   }, [isTyping]);
 
   // Debug: Test socket on mount
   useEffect(() => {
     if (!conversationId) return;
     
-    console.log('[Page] Component mounted, testing socket...');
     const socket = getSocket();
-    console.log('[Page] Socket status:', {
-      connected: socket.connected,
-      id: socket.id,
-      conversationId: conversationId
-    });
     
     // Test emit after 2 seconds
     setTimeout(() => {
-      console.log('[Page] TEST: Manually emitting typing:start');
       socket.emit("typing:start", { conversationId });
-      console.log('[Page] TEST: Emitted!');
     }, 2000);
   }, [conversationId]);
 
   // emit typing events with debounce
   useEffect(() => {
-    console.log('[Page] Typing effect triggered', { isTyping, conversationId });
     if (!isTyping || !conversationId) {
-      console.log('[Page] Skipping typing emit - isTyping:', isTyping, 'conversationId:', conversationId);
       return;
     }
     
-    console.log('[Page] About to emit typing:start');
     // Import socket dynamically
     import("@/core/realtime/socket").then(({ getSocket }) => {
       const socket = getSocket();
-      console.log('[Page] Socket obtained', { 
-        conversationId, 
-        socketId: socket.id,
-        connected: socket.connected 
-      });
-      
+
       const emitTypingStart = () => {
-        console.log('[Page] Emitting typing:start NOW', { conversationId });
         socket.emit("typing:start", { conversationId });
       };
       
       if (socket.connected) {
         emitTypingStart();
       } else {
-        console.log('[Page] Socket not connected yet, waiting...');
         socket.once('connect', emitTypingStart);
       }
       
       // Auto stop after 3 seconds
       const stopTimeout = setTimeout(() => {
-        console.log('[Page] Auto-emitting typing:stop after 3s', { conversationId });
         if (socket.connected) {
           socket.emit("typing:stop", { conversationId });
         }
@@ -184,7 +157,6 @@ export default function ChatDetailPage() {
       if (conversationId) {
         import("@/core/realtime/socket").then(({ getSocket }) => {
           const socket = getSocket();
-          console.log('[Page] Emitting typing:stop on unmount', { conversationId });
           if (socket.connected) {
             socket.emit("typing:stop", { conversationId });
           }
@@ -561,22 +533,17 @@ export default function ChatDetailPage() {
             value={text}
             onChange={(e) => {
               const newValue = e.target.value;
-              console.log('[Input] Text changed, value:', newValue);
               setText(newValue);
               
               // Emit typing event DIRECTLY here instead of relying on useEffect
               if (!isTyping && conversationId) {
-                console.log('[Input] Emitting typing:start DIRECTLY from onChange');
                 setIsTyping(true);
                 
                 const socket = getSocket();
                 if (socket.connected) {
-                  console.log('[Input] Socket connected, emitting now');
                   socket.emit("typing:start", { conversationId });
                 } else {
-                  console.log('[Input] Socket not connected, waiting...');
                   socket.once('connect', () => {
-                    console.log('[Input] Socket connected, emitting now');
                     socket.emit("typing:start", { conversationId });
                   });
                 }
@@ -606,10 +573,6 @@ export default function ChatDetailPage() {
           setSelectedUserId(null);
         }}
         user={selectedUser}
-        onSendMessage={(userId) => {
-          // TODO: Create or navigate to DM with this user
-          console.log("Send message to:", userId);
-        }}
       />
 
       <GroupDetailDialog

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { getSocket } from "@/core/realtime/socket";
-import { Message } from "@/domains/chat/types";
+import { Message, Conversation } from "@/domains/chat/types";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
 import { AnimatePresence } from "framer-motion";
@@ -32,7 +32,6 @@ export default function ChatsPage() {
     if (!data || data.length === 0) return;
     
     const socket = getSocket();
-    console.log(`[ChatsPage] Joining ${data.length} conversation rooms`);
     
     // Join all conversation rooms to receive events
     data.forEach(conversation => {
@@ -41,7 +40,6 @@ export default function ChatsPage() {
     
     return () => {
       // Leave all rooms on unmount
-      console.log(`[ChatsPage] Leaving ${data.length} conversation rooms`);
       data.forEach(conversation => {
         socket.emit("conversation:leave", { conversationId: conversation.id });
       });
@@ -57,20 +55,32 @@ export default function ChatsPage() {
   // Mark conversation as read when selected
   useEffect(() => {
     if (selectedId) {
+      // Optimistically update unread count to 0
+      queryClient.setQueryData<Conversation[]>(["chat", "conversations"], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map((conv) =>
+          conv.id === selectedId
+            ? { ...conv, unread_count: 0 }
+            : conv
+        );
+      });
+      
       // Mark as read after a short delay to ensure the user is viewing it
       const timer = setTimeout(() => {
         markAsRead(selectedId);
+        
+        // Refetch after giving backend time to process
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
+        }, 500);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [selectedId, markAsRead]);
+  }, [selectedId, markAsRead, queryClient]);
 
   // Listen for global typing and message events
   useEffect(() => {
-    console.log('[ChatsPage] ===== SETTING UP EVENT LISTENERS =====');
     const socket = getSocket();
-    console.log('[ChatsPage] Using socket instance:', socket.id, 'connected:', socket.connected);
-    console.log('[ChatsPage] Socket object:', socket);
     
     const handleTypingStart = (data: { conversationId?: string; conversation_id?: string }) => {
       const convId = data?.conversationId || data?.conversation_id;
@@ -104,7 +114,6 @@ export default function ChatsPage() {
     };
     
     const handleConversationCreated = () => {
-      console.log('[ChatsPage] conversation:created event received');
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
     };
     
@@ -112,16 +121,32 @@ export default function ChatsPage() {
       const convId = eventData?.conversationId || eventData?.conversation_id;
       
       if (convId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ["chat", "conversations"]
-        });
-        
         // Auto-mark as read if this message is for the currently selected conversation
         if (selectedIdRef.current === convId) {
-          // Small delay to ensure the message is processed first
+          // Optimistically update unread count to 0 immediately
+          queryClient.setQueryData<Conversation[]>(["chat", "conversations"], (oldData) => {
+            if (!oldData) return oldData;
+            return oldData.map((conv) =>
+              conv.id === convId
+                ? { ...conv, unread_count: 0 }
+                : conv
+            );
+          });
+          
+          // Then mark as read on backend
+          markAsRead(convId);
+          
+          // Delay refetch to allow backend to process mark-as-read
           setTimeout(() => {
-            markAsRead(convId);
-          }, 100);
+            queryClient.invalidateQueries({ 
+              queryKey: ["chat", "conversations"]
+            });
+          }, 500);
+        } else {
+          // For non-active conversations, refetch immediately
+          queryClient.invalidateQueries({ 
+            queryKey: ["chat", "conversations"]
+          });
         }
       }
     };
@@ -132,11 +157,7 @@ export default function ChatsPage() {
     socket.on('conversation:created', handleConversationCreated);
     socket.on('message:new', handleMessageNew);
     
-    console.log('[ChatsPage] ✅ All event listeners registered');
-    console.log('[ChatsPage] Socket listeners:', socket.listeners('message:new').length, 'for message:new');
-    
     return () => {
-      console.log('[ChatsPage] Cleaning up event listeners');
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
       socket.off('conversation:created', handleConversationCreated);
