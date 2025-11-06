@@ -32,6 +32,7 @@ export function useChatRealtime(
     onMessageNew?: (m: Message) => void;
     onTypingStart?: (userId: string) => void;
     onTypingStop?: (userId: string) => void;
+    onReactionUpdate?: (messageId: string, reactions: Record<string, any>) => void;
   }
 ) {
   // Use refs to store handlers so they're always up to date
@@ -97,9 +98,20 @@ export function useChatRealtime(
       handlersRef.current.onTypingStop?.(data?.userId || data?.user_id);
     }
 
+    function onReactionUpdate(data: any) {
+      console.log('[Realtime] Received message:reaction_updated', data);
+      if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
+      const messageId = data?.messageId || data?.message_id;
+      const reactions = data?.reactions || {};
+      if (messageId) {
+        handlersRef.current.onReactionUpdate?.(messageId, reactions);
+      }
+    }
+
     socket.on("message:new", onMessageNew);
     socket.on("typing:start", onTypingStart);
     socket.on("typing:stop", onTypingStop);
+    socket.on("message:reaction_updated", onReactionUpdate);
 
     return () => {
       console.log('[Realtime] Leaving conversation:', conversationId);
@@ -111,6 +123,7 @@ export function useChatRealtime(
       socket.off("message:new", onMessageNew);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
+      socket.off("message:reaction_updated", onReactionUpdate);
       console.log('[Realtime] Removed event listeners for conversation:', conversationId);
     };
   }, [conversationId]);

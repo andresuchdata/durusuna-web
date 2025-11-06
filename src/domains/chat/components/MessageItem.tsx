@@ -16,11 +16,12 @@ interface MessageItemProps {
   onReply?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
   onReact?: (messageId: string, emoji: string) => void;
+  onForward?: (messageId: string) => void;
   onAvatarClick?: (userId: string) => void;
   conversationType?: "direct" | "group";
 }
 
-export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, conversationType = "group" }: MessageItemProps) {
+export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAvatarClick, conversationType = "group" }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
@@ -73,6 +74,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"} group`}
+      data-message-id={m.id}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => {
         setShowActions(false);
@@ -92,7 +94,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
         </Avatar>
       )}
 
-      <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%]`}>
+      <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%] w-full`}>
         {/* Sender name for others' messages (only in group chats) */}
         {!isMine && conversationType === "group" && (
           <span className="text-xs text-muted-foreground mb-0.5 px-2">
@@ -101,27 +103,55 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
         )}
 
         {/* Message bubble */}
-        <div className="relative">
-          {/* Reply indicator */}
-          {m.reply_to && (
-            <div className={`text-xs px-3 py-1 mb-1 border-l-2 ${
-              isMine 
-                ? "border-emerald-400 bg-emerald-700/50" 
-                : "border-emerald-600 bg-gray-100 dark:bg-[#1f2c33]"
-            } rounded`}>
-              <div className="font-medium opacity-80">{m.reply_to.sender_name}</div>
-              <div className="opacity-60 truncate">{m.reply_to.content}</div>
-            </div>
-          )}
-
+        <div className="relative w-full max-w-full">
           {/* Main message */}
           <div
-            className={`rounded-2xl shadow-sm ${
+            className={`rounded-2xl shadow-sm w-full max-w-full ${
               isMine
-                ? "bg-emerald-600 text-white rounded-br-sm"
+                ? "bg-emerald-100 text-gray-900 rounded-br-sm"
                 : "bg-white dark:bg-[#134e3a] text-foreground dark:text-white rounded-bl-sm"
             } ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}`}
           >
+            {/* Reply indicator - WhatsApp style - INSIDE the bubble */}
+            {m.reply_to && (
+              <div 
+                className={`flex items-start gap-2 px-2.5 mx-[-0.5rem] py-1.5 mb-2 rounded-md w-[100% + .5rem] ${
+                  isMine 
+                    ? "bg-emerald-400/40 border-l-4 border-emerald-700" 
+                    : "bg-gray-100 dark:bg-[#1f2c33] border-l-4 border-emerald-600"
+                } cursor-pointer hover:opacity-80 transition-opacity`}
+                onClick={() => {
+                  // TODO: Scroll to original message
+                  const originalMessage = document.querySelector(`[data-message-id="${m.reply_to?.id}"]`);
+                  if (originalMessage) {
+                    originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Highlight the message briefly
+                    originalMessage.classList.add('ring-2', 'ring-emerald-500', 'ring-offset-2');
+                    setTimeout(() => {
+                      originalMessage.classList.remove('ring-2', 'ring-emerald-500', 'ring-offset-2');
+                    }, 2000);
+                  }
+                }}
+              >
+                {/* Reply content */}
+                <div className="flex-1 min-w-0 w-full overflow-hidden">
+                  <div className={`text-xs font-semibold mb-0.5 truncate ${
+                    isMine 
+                      ? "text-emerald-900" 
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}>
+                    {m.reply_to.sender_name}
+                  </div>
+                  <div className={`text-xs line-clamp-2 ${
+                    isMine 
+                      ? "text-gray-800" 
+                      : "text-gray-600 dark:text-gray-400"
+                  }`}>
+                    {m.reply_to.content || "Media"}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Media attachments */}
             {mediaItems.length > 0 && (
               <div className="mb-2">
@@ -140,11 +170,11 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
             )}
             
             <div className="flex items-center justify-end gap-1 mt-1">
-              <span className={`text-[10px] ${isMine ? 'text-emerald-100' : 'text-muted-foreground'}`}>
+              <span className="text-[10px] text-muted-foreground">
                 {new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {isMine && m.status && (
-                <span className="text-emerald-100">
+                <span className="text-emerald-600">
                   {m.status === 'read' ? (
                     <CheckCheck className="h-3 w-3" />
                   ) : m.status === 'delivered' ? (
@@ -189,7 +219,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onAvatarClick, 
                 }}
                 onReact={() => setShowReactionPicker(!showReactionPicker)}
                 onForward={() => {
-                  // TODO: Implement forward
+                  onForward?.(m.id);
                   setShowActions(false);
                 }}
                 onDelete={() => {

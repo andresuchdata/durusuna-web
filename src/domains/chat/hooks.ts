@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getConversations, getConversationMessages, sendMessage, createConversation, markConversationAsRead } from "./api";
+import { 
+  getConversations, 
+  getConversationMessages, 
+  sendMessage, 
+  createConversation, 
+  markConversationAsRead,
+  toggleReaction,
+  deleteMessage,
+  forwardMessage
+} from "./api";
 import type { Conversation, Message } from "./types";
 import { useChatRealtime } from "./realtime";
 
@@ -87,6 +96,34 @@ export function useConversationMessages(conversationId: string) {
         }
       );
     },
+    onReactionUpdate(messageId: string, reactions: Record<string, any>) {
+      console.log('[Hooks] Received reaction update', { messageId, reactions });
+      
+      // Update message in state
+      setAllMessages((prev) => 
+        prev.map((msg) => 
+          msg.id === messageId 
+            ? { ...msg, reactions } 
+            : msg
+        )
+      );
+      
+      // Also update query cache
+      qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
+        ["chat", "messages", conversationId, "initial"],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, reactions }
+                : msg
+            ),
+          };
+        }
+      );
+    },
   });
 
   return {
@@ -149,6 +186,64 @@ export function useMarkConversationAsRead() {
       });
       // Don't invalidate immediately - let the caller control when to refetch
       // to avoid race conditions with backend processing
+    },
+  });
+}
+
+export function useToggleReaction(conversationId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      toggleReaction(messageId, emoji),
+    onSuccess: (data, variables) => {
+      // Update the message in the cache with new reactions
+      qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
+        ["chat", "messages", conversationId, "initial"],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((msg) =>
+              msg.id === variables.messageId
+                ? { ...msg, reactions: data.reactions }
+                : msg
+            ),
+          };
+        }
+      );
+    },
+  });
+}
+
+export function useDeleteMessage(conversationId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => deleteMessage(messageId),
+    onSuccess: (_, messageId) => {
+      // Remove the message from the cache
+      qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
+        ["chat", "messages", conversationId, "initial"],
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.filter((msg) => msg.id !== messageId),
+          };
+        }
+      );
+      qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
+    },
+  });
+}
+
+export function useForwardMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, targetConversationId }: { messageId: string; targetConversationId: string }) =>
+      forwardMessage(messageId, targetConversationId),
+    onSuccess: () => {
+      // Invalidate conversations to show the new message
+      qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
     },
   });
 }

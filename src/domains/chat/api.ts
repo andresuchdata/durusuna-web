@@ -40,7 +40,7 @@ export async function sendMessage(
     conversation_id: conversationId,
     content: text,
     message_type: options?.attachments && options.attachments.length > 0 ? 'media' : 'text',
-    reply_to: options?.replyTo,
+    reply_to_id: options?.replyTo, // Backend expects reply_to_id
     attachments: options?.attachments,
   });
   return data.message || data;
@@ -81,4 +81,20 @@ export async function createConversation(params: {
 export async function markConversationAsRead(conversationId: string): Promise<void> {
   await http().put(`/conversations/${conversationId}/mark-read`);
   console.log('[API] Marking conversation as read:', conversationId);
+}
+
+export async function toggleReaction(messageId: string, emoji: string): Promise<{ reactions: Record<string, any> }> {
+  const { data } = await http().post(`/messages/${messageId}/reactions`, { emoji });
+  return data;
+}
+
+export async function forwardMessage(messageId: string, targetConversationId: string): Promise<Message> {
+  const { data } = await http().post(`/messages/${messageId}/forward`, { 
+    conversation_id: targetConversationId 
+  });
+  return data.message || data;
+}
+
+export async function deleteMessage(messageId: string): Promise<void> {
+  await http().delete(`/messages/${messageId}`);
 }

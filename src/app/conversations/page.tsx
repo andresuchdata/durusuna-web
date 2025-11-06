@@ -7,7 +7,7 @@ import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -15,7 +15,7 @@ import { getSocket } from "@/core/realtime/socket";
 import { Message, Conversation } from "@/domains/chat/types";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 export default function ChatsPage() {
   const { data, isLoading, error } = useConversations();
@@ -354,6 +354,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const { data: profile } = useProfile();
   const me = profile?.id ?? null;
   const [text, setText] = useState("");
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [theirTyping, setTheirTyping] = useState(false);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
@@ -429,8 +430,12 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   async function onSend(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
-    await send({ text });
+    await send({ 
+      text: text.trim(),
+      replyTo: replyTo?.id 
+    });
     setText("");
+    setReplyTo(null);
     inputRef.current?.focus();
   }
 
@@ -454,6 +459,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                 key={msg.id} 
                 m={msg} 
                 me={me}
+                onReply={setReplyTo}
                 conversationType={conversation?.type}
               />
             ))}
@@ -470,8 +476,79 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
       </div>
 
       {/* Composer - Above mobile nav */}
-      <div className="p-3 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom)+12px)] md:pb-4 bg-white dark:bg-card border-t border-border">
-        <form onSubmit={onSend} className="flex gap-2">
+      <div className="pb-[calc(0.75rem+env(safe-area-inset-bottom)+12px)] md:pb-4 bg-white dark:bg-card border-t border-border">
+        {/* Reply preview - WhatsApp style */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="px-4 pt-2.5 pb-2 bg-[#e5ddd5] dark:bg-[#1f2c33] border-b border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex items-start gap-2">
+                {/* Colored vertical bar */}
+                <div className="w-1 h-10 bg-emerald-600 rounded-full shrink-0 mt-0.5" />
+                
+                {/* Message content */}
+                <div className="flex-1 min-w-0 py-0.5 overflow-hidden">
+                  {/* "Replying to [Name]" label */}
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Replying to
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                      {replyTo.sender 
+                        ? `${replyTo.sender.first_name} ${replyTo.sender.last_name}`
+                        : "Unknown"}
+                    </span>
+                  </div>
+                  
+                  {/* Message preview */}
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    {/* Media/File indicator */}
+                    {replyTo.attachments && replyTo.attachments.length > 0 ? (
+                      <>
+                        {replyTo.attachments[0].type?.startsWith('image/') ? (
+                          <ImageIcon className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : replyTo.attachments[0].type?.startsWith('video/') ? (
+                          <Video className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : replyTo.attachments[0].type?.startsWith('audio/') ? (
+                          <Music className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : (
+                          <File className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        )}
+                        <span className="text-xs text-gray-600 dark:text-gray-400 italic truncate">
+                          {replyTo.attachments[0].type?.startsWith('image/') ? 'Photo' :
+                           replyTo.attachments[0].type?.startsWith('video/') ? 'Video' :
+                           replyTo.attachments[0].type?.startsWith('audio/') ? 'Audio' :
+                           'File'}
+                        </span>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-700 dark:text-gray-300 truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                        {replyTo.text || replyTo.content || "Message"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Close button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setReplyTo(null)}
+                  className="h-6 w-6 p-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full shrink-0 mt-0.5"
+                >
+                  <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <form onSubmit={onSend} className="p-3 md:p-4 flex gap-2">
           <input
             ref={inputRef}
             value={text}

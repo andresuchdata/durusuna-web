@@ -1,17 +1,17 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useConversationMessages, useSendMessage, useConversations } from "@/domains/chat/hooks";
+import { useConversationMessages, useSendMessage, useConversations, useToggleReaction, useDeleteMessage, useForwardMessage } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { UserDetailDialog } from "@/domains/chat/components/UserDetailDialog";
 import { GroupDetailDialog } from "@/domains/chat/components/GroupDetailDialog";
-import { Input } from "@/components/ui/input";
+import { ForwardMessageDialog } from "@/domains/chat/components/ForwardMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useChatRealtime } from "@/domains/chat/realtime";
-import { X, Send, Paperclip, ArrowLeft, Search, MoreVertical } from "lucide-react";
+import { X, Send, Paperclip, ArrowLeft, Search, MoreVertical, Image as ImageIcon, File, Video, Music } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "@/domains/chat/types";
 import { useMediaUpload } from "@/shared/hooks/useMediaUpload";
@@ -39,8 +39,13 @@ export default function ChatDetailPage() {
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [forwardMessageId, setForwardMessageId] = useState<string | null>(null);
+  const [showForwardDialog, setShowForwardDialog] = useState(false);
   
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
+  const { mutate: reactToMessage } = useToggleReaction(conversationId);
+  const { mutate: deleteMsg } = useDeleteMessage(conversationId);
+  const { mutate: forwardMsg, isPending: isForwarding } = useForwardMessage();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toggleMobileSidebar } = useSidebar();
@@ -221,13 +226,30 @@ export default function ChatDetailPage() {
   }
 
   const handleReact = (messageId: string, emoji: string) => {
-    // TODO: Implement reaction API call
-    console.log("React:", messageId, emoji);
+    reactToMessage({ messageId, emoji });
   };
 
   const handleDelete = (messageId: string) => {
-    // TODO: Implement delete API call
-    console.log("Delete:", messageId);
+    deleteMsg(messageId);
+  };
+
+  const handleForward = (messageId: string) => {
+    setForwardMessageId(messageId);
+    setShowForwardDialog(true);
+  };
+
+  const handleForwardConfirm = (targetConversationId: string) => {
+    if (forwardMessageId) {
+      forwardMsg(
+        { messageId: forwardMessageId, targetConversationId },
+        {
+          onSuccess: () => {
+            setShowForwardDialog(false);
+            setForwardMessageId(null);
+          },
+        }
+      );
+    }
   };
 
   const handleAvatarClick = (userId: string) => {
@@ -434,6 +456,7 @@ export default function ChatDetailPage() {
                   onReply={setReplyTo}
                   onDelete={handleDelete}
                   onReact={handleReact}
+                  onForward={handleForward}
                   onAvatarClick={handleAvatarClick}
                 />
               ))}
@@ -457,24 +480,64 @@ export default function ChatDetailPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="px-4 pt-3 pb-2 bg-gray-50 dark:bg-[#1f2c33]"
+              transition={{ duration: 0.2 }}
+              className="px-4 pt-2.5 pb-2 bg-[#e5ddd5] dark:bg-[#1f2c33] border-b border-gray-200 dark:border-gray-700"
             >
-              <div className="flex items-start gap-2 border-l-4 border-emerald-600 pl-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    {replyTo.sender?.first_name || "Unknown"}
+              <div className="flex items-start gap-2">
+                {/* Colored vertical bar */}
+                <div className="w-1 h-10 bg-emerald-600 rounded-full shrink-0 mt-0.5" />
+                
+                {/* Message content */}
+                <div className="flex-1 min-w-0 py-0.5 overflow-hidden">
+                  {/* "Replying to [Name]" label */}
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Replying to
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                      {replyTo.sender 
+                        ? `${replyTo.sender.first_name} ${replyTo.sender.last_name}`
+                        : "Unknown"}
+                    </span>
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300 truncate mt-0.5">
-                    {replyTo.text || replyTo.content || "Media"}
+                  
+                  {/* Message preview */}
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    {/* Media/File indicator */}
+                    {replyTo.attachments && replyTo.attachments.length > 0 ? (
+                      <>
+                        {replyTo.attachments[0].type?.startsWith('image/') ? (
+                          <ImageIcon className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : replyTo.attachments[0].type?.startsWith('video/') ? (
+                          <Video className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : replyTo.attachments[0].type?.startsWith('audio/') ? (
+                          <Music className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        ) : (
+                          <File className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
+                        )}
+                        <span className="text-xs text-gray-600 dark:text-gray-400 italic truncate">
+                          {replyTo.attachments[0].type?.startsWith('image/') ? 'Photo' :
+                           replyTo.attachments[0].type?.startsWith('video/') ? 'Video' :
+                           replyTo.attachments[0].type?.startsWith('audio/') ? 'Audio' :
+                           'File'}
+                        </span>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-700 dark:text-gray-300 truncate whitespace-nowrap overflow-hidden text-ellipsis">
+                        {replyTo.text || replyTo.content || "Message"}
+                      </p>
+                    )}
                   </div>
                 </div>
+                
+                {/* Close button */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setReplyTo(null)}
-                  className="h-7 w-7 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="h-6 w-6 p-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full shrink-0 mt-0.5"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
                 </Button>
               </div>
             </motion.div>
@@ -583,6 +646,14 @@ export default function ChatDetailPage() {
           setSelectedUserId(userId);
           setShowUserDialog(true);
         }}
+      />
+
+      <ForwardMessageDialog
+        open={showForwardDialog}
+        onOpenChange={setShowForwardDialog}
+        conversations={conversations?.filter(c => c.id !== conversationId) || []}
+        onForward={handleForwardConfirm}
+        isForwarding={isForwarding}
       />
       </div>
     </AppLayout>
