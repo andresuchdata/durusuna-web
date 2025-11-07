@@ -46,7 +46,7 @@ export function useChatRealtime(
     onMessageNew?: (m: Message) => void;
     onTypingStart?: (userId: string) => void;
     onTypingStop?: (userId: string) => void;
-    onReactionUpdate?: (messageId: string, reactions: Record<string, any>) => void;
+    onReactionUpdate?: (messageId: string, reactions: Record<string, string[]>) => void;
   }
 ) {
   // Use refs to store handlers so they're always up to date
@@ -105,7 +105,7 @@ export function useChatRealtime(
     function onReactionUpdate(data: any) {
       if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
       const messageId = data?.messageId || data?.message_id;
-      const reactions = data?.reactions || {};
+      const reactions: Record<string, string[]> = data?.reactions ?? {};
       if (messageId) {
         handlersRef.current.onReactionUpdate?.(messageId, reactions);
       }

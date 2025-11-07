@@ -7,7 +7,7 @@ import {
   useClass,
   useClassStudents,
   useClassTeachers,
-  useClassLessons,
+  useClassSubjects,
   useDeleteClass,
 } from "@/domains/classes/hooks";
 import { useProfile } from "@/domains/auth/hooks";
@@ -49,9 +49,10 @@ import {
   Mail,
   Clock,
   AlertCircle,
+  Building2,
 } from "lucide-react";
 
-type TabType = "students" | "teachers" | "lessons";
+type TabType = "students" | "teachers" | "subjects";
 
 export default function ClassDetailPage() {
   const params = useParams();
@@ -65,7 +66,7 @@ export default function ClassDetailPage() {
     search: searchQuery,
   });
   const { data: teachersData, isLoading: teachersLoading } = useClassTeachers(classId);
-  const { data: lessonsData, isLoading: lessonsLoading } = useClassLessons(classId);
+  const { data: subjectsData, isLoading: subjectsLoading } = useClassSubjects(classId);
   const deleteClass = useDeleteClass();
 
   const [activeTab, setActiveTab] = useState<TabType>("students");
@@ -74,12 +75,16 @@ export default function ClassDetailPage() {
 
   const students = studentsData?.students || [];
   const teachers = teachersData?.teachers || [];
-  const lessons = lessonsData?.lessons || [];
+  const subjects = subjectsData?.subjects || [];
 
-  const isAdmin = profile?.role === "admin" || profile?.user_type === "admin";
+  const role = profile?.role;
+  const userType = profile?.user_type;
+  const isAdmin = role === "admin" || userType === "admin";
+  const isTeacher = role === "teacher" || userType === "teacher";
+  const canManageClass = isAdmin || isTeacher;
 
   const handleDelete = async () => {
-    if (!classData) return;
+    if (!classData || !canManageClass) return;
     try {
       await deleteClass.mutateAsync(classData.id);
       setDeleteDialogOpen(false);
@@ -150,7 +155,7 @@ export default function ClassDetailPage() {
                 Back to Classes
               </Button>
 
-              {isAdmin && (
+              {canManageClass && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -249,8 +254,8 @@ export default function ClassDetailPage() {
                   <BookOpen className="h-5 w-5 text-purple-600" />
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-gray-900">{lessons.length}</div>
-                  <div className="text-xs text-gray-600">Lessons</div>
+                  <div className="text-xl font-bold text-gray-900">{subjects.length}</div>
+                  <div className="text-xs text-gray-600">Subjects</div>
                 </div>
               </div>
             </div>
@@ -283,15 +288,15 @@ export default function ClassDetailPage() {
                   <span>Teachers ({teachers.length})</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab("lessons")}
+                  onClick={() => setActiveTab("subjects")}
                   className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === "lessons"
+                    activeTab === "subjects"
                       ? "border-b-2 border-primary text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-gray-50"
                   }`}
                 >
                   <BookOpen className="h-4 w-4" />
-                  <span>Lessons ({lessons.length})</span>
+                  <span>Subjects ({subjects.length})</span>
                 </button>
               </div>
             </div>
@@ -439,8 +444,8 @@ export default function ClassDetailPage() {
                 )
               )}
 
-              {activeTab === "lessons" && (
-                lessonsLoading ? (
+              {activeTab === "subjects" && (
+                subjectsLoading ? (
                   <div className="space-y-3">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <div key={i} className="p-4 bg-white rounded-xl">
@@ -449,62 +454,73 @@ export default function ClassDetailPage() {
                       </div>
                     ))}
                   </div>
-                ) : lessons.length > 0 ? (
+                ) : subjects.length > 0 ? (
                   <div className="space-y-3">
-                    {lessons.map((lesson: {id: string; title: string; content?: string; lesson_date?: string; duration_minutes?: number; status?: string}) => (
-                      <div
-                        key={lesson.id}
-                        className="p-4 rounded-xl hover:bg-gray-50 transition-colors bg-white border"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-base mb-2">{lesson.title}</h4>
-                            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                              {lesson.lesson_date && (
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="h-4 w-4" />
-                                  <span>
-                                    {new Date(lesson.lesson_date).toLocaleDateString()}
-                                  </span>
-                                </div>
+                    {subjects.map((subject) => {
+                      const teacherName = subject.teacher
+                        ? [subject.teacher.first_name, subject.teacher.last_name]
+                            .filter(Boolean)
+                            .join(" ")
+                        : "";
+
+                      return (
+                        <div
+                          key={subject.subject_id}
+                          className="p-4 rounded-xl hover:bg-gray-50 transition-colors bg-white border"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-base mb-1">
+                                {subject.subject_name}
+                              </h4>
+                              {subject.subject_code && (
+                                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
+                                  {subject.subject_code}
+                                </p>
                               )}
-                              {lesson.duration_minutes && (
-                                <div className="flex items-center gap-1.5">
-                                  <Clock className="h-4 w-4" />
-                                  <span>{lesson.duration_minutes} min</span>
-                                </div>
+                              {subject.subject_description && (
+                                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                  {subject.subject_description}
+                                </p>
                               )}
+                              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                                {teacherName && (
+                                  <div className="flex items-center gap-1.5">
+                                    <UserCheck className="h-4 w-4 text-green-600" />
+                                    <span>{teacherName}</span>
+                                  </div>
+                                )}
+                                {subject.classroom && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Building2 className="h-4 w-4 text-blue-600" />
+                                    <span>Room {subject.classroom}</span>
+                                  </div>
+                                )}
+                                {typeof subject.hours_per_week === "number" && subject.hours_per_week > 0 && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="h-4 w-4 text-purple-600" />
+                                    <span>{subject.hours_per_week} hr/week</span>
+                                  </div>
+                                )}
+                                {subject.lessons && subject.lessons.length > 0 && (
+                                  <div className="flex items-center gap-1.5">
+                                    <BookOpen className="h-4 w-4 text-amber-600" />
+                                    <span>{subject.lessons.length} lessons</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            {lesson.content && (
-                              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                                {lesson.content}
-                              </p>
-                            )}
                           </div>
-                          {lesson.status && (
-                            <Badge
-                              variant={
-                                lesson.status === "completed"
-                                  ? "default"
-                                  : lesson.status === "in_progress"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                              className="shrink-0"
-                            >
-                              {lesson.status}
-                            </Badge>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-16 text-muted-foreground">
                     <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-2">No lessons yet</p>
+                    <p className="text-lg font-medium mb-2">No subjects yet</p>
                     <p className="text-sm">
-                      Lessons and subjects will appear here once teachers create them
+                      Subjects will appear here once they become available for this class.
                     </p>
                   </div>
                 )
@@ -515,7 +531,7 @@ export default function ClassDetailPage() {
       </div>
 
       {/* Edit Dialog */}
-      {isAdmin && (
+      {canManageClass && (
         <EditClassDialog
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
@@ -525,7 +541,7 @@ export default function ClassDetailPage() {
       )}
 
       {/* Delete Confirmation Dialog */}
-      {isAdmin && (
+      {canManageClass && (
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

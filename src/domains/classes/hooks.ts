@@ -10,6 +10,7 @@ import {
   fetchClassStudents,
   fetchClassTeachers,
   fetchClassLessons,
+  fetchClassSubjects,
 } from "./api";
 import type {
   Class,
@@ -17,6 +18,7 @@ import type {
   CreateClassRequest,
   UpdateClassRequest,
   ClassFilters,
+  ClassSubjectsResponse,
 } from "./types";
 
 /**
@@ -117,6 +119,18 @@ export function useClassLessons(classId: string | undefined) {
   return useQuery({
     queryKey: ["classes", classId, "lessons"],
     queryFn: () => fetchClassLessons(classId!),
+    enabled: !!classId,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Hook to fetch subjects for a class
+ */
+export function useClassSubjects(classId: string | undefined) {
+  return useQuery<ClassSubjectsResponse>({
+    queryKey: ["classes", classId, "subjects"],
+    queryFn: () => fetchClassSubjects(classId!),
     enabled: !!classId,
     staleTime: 30_000,
   });

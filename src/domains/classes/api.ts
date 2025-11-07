@@ -6,6 +6,7 @@ import type {
   UpdateClassRequest,
   ClassFilters,
   ClassesResponse,
+  ClassSubjectsResponse,
 } from "./types";
 
 /**
@@ -105,5 +106,13 @@ export async function fetchClassTeachers(classId: string) {
 export async function fetchClassLessons(classId: string) {
   const res = await http().get(`/classes/${classId}/lessons`);
   return res.data;
+}
+
+/**
+ * Fetch subjects for a class
+ */
+export async function fetchClassSubjects(classId: string): Promise<ClassSubjectsResponse> {
+  const res = await http().get(`/classes/${classId}/subjects`);
+  return res.data as ClassSubjectsResponse;
 }
 

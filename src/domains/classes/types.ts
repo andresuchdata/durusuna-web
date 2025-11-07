@@ -72,3 +72,34 @@ export interface ClassesResponse {
   };
 }
 
+export interface ClassLesson {
+  id: string;
+  title: string;
+  content?: string;
+  lesson_date?: string;
+  duration_minutes?: number;
+  status?: string;
+}
+
+export interface ClassSubject {
+  subject_id: string;
+  subject_name: string;
+  subject_code?: string;
+  subject_description?: string;
+  hours_per_week?: number;
+  classroom?: string | null;
+  schedule?: Record<string, any> | null;
+  teacher?: {
+    id?: string | null;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    avatar_url?: string;
+  } | null;
+  lessons?: ClassLesson[];
+}
+
+export interface ClassSubjectsResponse {
+  subjects: ClassSubject[];
+}
+

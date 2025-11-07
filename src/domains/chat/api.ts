@@ -83,10 +83,16 @@ export async function markConversationAsRead(conversationId: string): Promise<vo
   console.log('[API] Marking conversation as read:', conversationId);
 }
 
-export async function toggleReaction(messageId: string, emoji: string): Promise<{ reactions: Record<string, any> }> {
+export async function toggleReaction(
+  messageId: string,
+  emoji: string
+): Promise<{ reactions: Record<string, string[]> }> {
   console.log('[API] toggleReaction called:', { messageId, emoji });
   try {
-    const { data } = await http().post(`/messages/${messageId}/reactions`, { emoji });
+    const { data } = await http().post<{ reactions: Record<string, string[]> }>(
+      `/messages/${messageId}/reactions`,
+      { emoji }
+    );
     console.log('[API] toggleReaction response:', data);
     return data;
   } catch (error) {
