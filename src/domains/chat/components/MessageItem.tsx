@@ -54,7 +54,21 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   };
 
   const handleReaction = (emoji: string) => {
-    onReact?.(m.id, emoji);
+    const messageId = m.id || m.serverId;
+    if (!messageId) {
+      console.error("Message ID is missing:", m);
+      return;
+    }
+    if (!onReact) {
+      console.warn("onReact callback is not provided; reaction ignored.");
+      setShowReactionPicker(false);
+      return;
+    }
+    try {
+      onReact(messageId, emoji);
+    } catch (error) {
+      console.error("Error calling onReact:", error);
+    }
     setShowReactionPicker(false);
   };
 
@@ -214,7 +228,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                   key={emoji}
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => onReact?.(m.id, emoji)}
+                  onClick={() => handleReaction(emoji)}
                   className={`flex items-center gap-0.5 ${hasReacted ? "font-semibold" : ""}`}
                 >
                   <span className="text-sm">{emoji}</span>

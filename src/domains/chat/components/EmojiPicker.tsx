@@ -163,9 +163,19 @@ export function EmojiPickerComponent({ onSelectEmoji, onClose, position = "top" 
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-50" 
-        onClick={onClose}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[55] bg-black/20" 
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        onMouseDown={(e) => {
+          // Prevent any other handlers from interfering
+          e.stopPropagation();
+        }}
       />
       
       {/* Emoji Picker */}
@@ -182,6 +192,7 @@ export function EmojiPickerComponent({ onSelectEmoji, onClose, position = "top" 
           transform: `translateX(${adjustedPosition.offsetX}px) translateY(${adjustedPosition.offsetY}px)`,
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="bg-white dark:bg-[#1f2c33] border border-border rounded-lg shadow-2xl overflow-hidden 
           [&_.epr-emoji-category-label]:bg-transparent 

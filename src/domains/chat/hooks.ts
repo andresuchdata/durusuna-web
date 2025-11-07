@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   getConversations, 
@@ -27,7 +27,6 @@ export function useConversations() {
 export function useConversationMessages(conversationId: string) {
   const qc = useQueryClient();
   const [allMessages, setAllMessages] = useState<Message[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
@@ -44,6 +43,7 @@ export function useConversationMessages(conversationId: string) {
       setNextCursor(data.nextCursor ?? null);
     }
   }, [data]);
+
 
   // Load more handler
   const loadMore = async () => {
@@ -91,6 +91,32 @@ export function useConversationMessages(conversationId: string) {
 
     return message;
   };
+
+  // Listen for custom reaction update events (from mutations)
+  useEffect(() => {
+    const handleCustomReactionUpdate = (event: CustomEvent) => {
+      const { messageId, reactions, conversationId: eventConvId } = event.detail;
+      if (eventConvId === conversationId && messageId && reactions) {
+        console.log('Custom reaction update event received:', { messageId, reactions });
+        // Trigger the onReactionUpdate handler
+        setAllMessages((prev) => 
+          prev.map((msg) => {
+            const matches = msg.id === messageId || msg.serverId === messageId;
+            if (matches) {
+              console.log('Updating message reactions from custom event:', msg.id || msg.serverId, reactions);
+              return { ...msg, reactions };
+            }
+            return msg;
+          })
+        );
+      }
+    };
+    
+    window.addEventListener('message:reaction_updated', handleCustomReactionUpdate as EventListener);
+    return () => {
+      window.removeEventListener('message:reaction_updated', handleCustomReactionUpdate as EventListener);
+    };
+  }, [conversationId]);
 
   // realtime add
   useChatRealtime(conversationId, {
@@ -159,13 +185,17 @@ export function useConversationMessages(conversationId: string) {
       );
     },
     onReactionUpdate(messageId: string, reactions: Record<string, string[]>) {
-      // Update message in state
+      console.log('onReactionUpdate called:', { messageId, reactions });
+      // Update message in state - match by either id or serverId
       setAllMessages((prev) => 
-        prev.map((msg) => 
-          msg.id === messageId 
-            ? { ...msg, reactions } 
-            : msg
-        )
+        prev.map((msg) => {
+          const matches = msg.id === messageId || msg.serverId === messageId;
+          if (matches) {
+            console.log('Updating message reactions in local state:', msg.id || msg.serverId, reactions);
+            return { ...msg, reactions };
+          }
+          return msg;
+        })
       );
       
       // Also update query cache
@@ -175,11 +205,13 @@ export function useConversationMessages(conversationId: string) {
           if (!old) return old;
           return {
             ...old,
-            items: old.items.map((msg) =>
-              msg.id === messageId
-                ? { ...msg, reactions }
-                : msg
-            ),
+            items: old.items.map((msg) => {
+              const matches = msg.id === messageId || msg.serverId === messageId;
+              if (matches) {
+                return { ...msg, reactions };
+              }
+              return msg;
+            }),
           };
         }
       );
@@ -252,10 +284,24 @@ export function useMarkConversationAsRead() {
 
 export function useToggleReaction(conversationId: string) {
   const qc = useQueryClient();
+  console.log('useToggleReaction hook initialized with conversationId:', conversationId);
+  
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      toggleReaction(messageId, emoji),
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      console.log('useToggleReaction mutationFn called:', { messageId, emoji, conversationId });
+      if (!messageId) {
+        console.error('Message ID is missing in mutationFn');
+        throw new Error('Message ID is required');
+      }
+      if (!emoji) {
+        console.error('Emoji is missing in mutationFn');
+        throw new Error('Emoji is required');
+      }
+      console.log('Calling toggleReaction API...');
+      return toggleReaction(messageId, emoji);
+    },
     onSuccess: (data, variables) => {
+      console.log('useToggleReaction onSuccess:', { data, variables });
       // Update the message in the cache with new reactions
       qc.setQueryData<{ items: Message[]; nextCursor?: string | null }>(
         ["chat", "messages", conversationId, "initial"],
@@ -263,14 +309,32 @@ export function useToggleReaction(conversationId: string) {
           if (!old) return old;
           return {
             ...old,
-            items: old.items.map((msg) =>
-              msg.id === variables.messageId
-                ? { ...msg, reactions: data.reactions }
-                : msg
-            ),
+            items: old.items.map((msg) => {
+              // Match by either id or serverId
+              const matches = msg.id === variables.messageId || msg.serverId === variables.messageId;
+              if (matches) {
+                console.log('Updating message reactions in cache:', msg.id || msg.serverId, data.reactions);
+                return { ...msg, reactions: data.reactions };
+              }
+              return msg;
+            }),
           };
         }
       );
+      
+      // Also trigger a custom event to update local state immediately
+      // This will be picked up by useConversationMessages if it's listening
+      // For now, we rely on the realtime event, but this ensures cache is updated
+      window.dispatchEvent(new CustomEvent('message:reaction_updated', {
+        detail: {
+          messageId: variables.messageId,
+          reactions: data.reactions,
+          conversationId,
+        },
+      }));
+    },
+    onError: (error) => {
+      console.error('useToggleReaction error:', error);
     },
   });
 }

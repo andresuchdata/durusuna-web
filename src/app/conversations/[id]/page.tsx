@@ -44,10 +44,15 @@ export default function ChatDetailPage() {
   const [showForwardDialog, setShowForwardDialog] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  const { mutateAsync: send, isPending } = useSendMessage(conversationId);
-  const { mutate: reactToMessage } = useToggleReaction(conversationId);
-  const { mutate: deleteMsg } = useDeleteMessage(conversationId);
+  // Only initialize hooks when conversationId is available
+  const { mutateAsync: send, isPending } = useSendMessage(conversationId || '');
+  const toggleReactionMutation = useToggleReaction(conversationId || '');
+  const { mutate: deleteMsg } = useDeleteMessage(conversationId || '');
   const { mutate: forwardMsg, isPending: isForwarding } = useForwardMessage();
+  
+  // Get reactToMessage from mutation object - ensure it's always available
+  const reactToMessage = toggleReactionMutation?.mutate;
+  
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toggleMobileSidebar } = useSidebar();
@@ -227,9 +232,41 @@ export default function ChatDetailPage() {
     }
   }
 
-  const handleReact = (messageId: string, emoji: string) => {
-    reactToMessage({ messageId, emoji });
-  };
+  // Use ref to store the latest reactToMessage to avoid closure issues
+  const reactToMessageRef = useRef(reactToMessage);
+  useEffect(() => {
+    reactToMessageRef.current = reactToMessage;
+  }, [reactToMessage]);
+  
+  // Define handleReact with stable reference - always defined
+  const handleReact = useCallback((messageId: string, emoji: string) => {
+    const currentReactToMessage = reactToMessageRef.current;
+    
+    if (!messageId) {
+      console.error('Message ID is missing in handleReact');
+      return;
+    }
+    if (!conversationId) {
+      console.error('Conversation ID is missing in handleReact:', conversationId);
+      return;
+    }
+    if (!currentReactToMessage) {
+      console.error('reactToMessage function is not defined!', currentReactToMessage);
+      return;
+    }
+    try {
+      currentReactToMessage({ messageId, emoji }, {
+        onSuccess: (data) => {
+          console.log('Reaction success:', data);
+        },
+        onError: (error) => {
+          console.error('Reaction error:', error);
+        },
+      });
+    } catch (error) {
+      console.error('Error calling reactToMessage:', error);
+    }
+  }, [conversationId]); // Only depend on conversationId, not reactToMessage
 
   const handleDelete = (messageId: string) => {
     deleteMsg(messageId);

@@ -84,8 +84,15 @@ export async function markConversationAsRead(conversationId: string): Promise<vo
 }
 
 export async function toggleReaction(messageId: string, emoji: string): Promise<{ reactions: Record<string, any> }> {
-  const { data } = await http().post(`/messages/${messageId}/reactions`, { emoji });
-  return data;
+  console.log('[API] toggleReaction called:', { messageId, emoji });
+  try {
+    const { data } = await http().post(`/messages/${messageId}/reactions`, { emoji });
+    console.log('[API] toggleReaction response:', data);
+    return data;
+  } catch (error) {
+    console.error('[API] toggleReaction error:', error);
+    throw error;
+  }
 }
 
 export async function forwardMessage(messageId: string, targetConversationId: string): Promise<Message> {

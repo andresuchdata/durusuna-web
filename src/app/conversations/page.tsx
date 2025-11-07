@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
@@ -358,6 +358,12 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [isTyping, setIsTyping] = useState(false);
   const [theirTyping, setTheirTyping] = useState(false);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
+  const toggleReactionMutation = useToggleReaction(conversationId);
+  const reactToMessage = toggleReactionMutation?.mutate;
+  const reactToMessageRef = useRef(reactToMessage);
+  useEffect(() => {
+    reactToMessageRef.current = reactToMessage;
+  }, [reactToMessage]);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -427,6 +433,19 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     }
   }, [items]);
 
+  const handleReact = useCallback((messageId: string, emoji: string) => {
+    const mutateFn = reactToMessageRef.current;
+    if (!mutateFn) {
+      console.error("reactToMessage mutation is not available");
+      return;
+    }
+    if (!messageId) {
+      console.error("Message ID is missing for reaction");
+      return;
+    }
+    mutateFn({ messageId, emoji });
+  }, [conversationId]);
+
   async function onSend(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
@@ -460,6 +479,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                 m={msg} 
                 me={me}
                 onReply={setReplyTo}
+                onReact={handleReact}
                 conversationType={conversation?.type}
               />
             ))}
@@ -584,7 +604,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 }
 
 // Import required hooks
-import { useConversationMessages, useSendMessage, useMarkConversationAsRead } from "@/domains/chat/hooks";
+import { useConversationMessages, useSendMessage, useMarkConversationAsRead, useToggleReaction } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";
