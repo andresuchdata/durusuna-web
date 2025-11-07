@@ -73,6 +73,15 @@ export default function ClassesPage() {
   const { data: classes, isLoading, error, refetch } = useClasses(queryFilters);
   const deleteClass = useDeleteClass();
 
+  const role = profile?.role;
+  const userType = profile?.user_type;
+  const isAdmin = role === "admin" || userType === "admin";
+  const isTeacher = role === "teacher" || userType === "teacher";
+  const isParent = userType === "parent";
+  const isStudent = userType === "student";
+  const canManageClasses = isAdmin || isTeacher;
+  const canViewClasses = canManageClasses || isParent || isStudent;
+
   const hasActiveFilters = Object.keys(activeFilters).length > 0 || searchQuery.length > 0;
 
   const clearFilters = () => {
@@ -91,17 +100,19 @@ export default function ClassesPage() {
   };
 
   const handleEdit = (classData: Class) => {
+    if (!canManageClasses) return;
     setSelectedClass(classData);
     setEditDialogOpen(true);
   };
 
   const handleDelete = (classData: Class) => {
+    if (!canManageClasses) return;
     setSelectedClass(classData);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedClass) return;
+    if (!selectedClass || !canManageClasses) return;
 
     try {
       await deleteClass.mutateAsync(selectedClass.id);
@@ -122,9 +133,6 @@ export default function ClassesPage() {
     refetch();
   };
 
-  // Check if user is admin
-  const isAdmin = profile?.role === "admin" || profile?.user_type === "admin";
-
   // Show loading state while checking profile
   if (profileLoading) {
     return (
@@ -136,8 +144,8 @@ export default function ClassesPage() {
     );
   }
 
-  // Show access denied if not admin
-  if (!isAdmin) {
+  // Show access denied if user cannot view classes
+  if (!canViewClasses) {
     return (
       <AppLayout>
         <div className="container mx-auto p-4 md:p-6">
@@ -147,7 +155,7 @@ export default function ClassesPage() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
             <p className="text-muted-foreground mb-6">
-              You need administrator privileges to manage classes.
+              You need to be assigned to a class or have administrator privileges to view this page.
             </p>
             <Button onClick={() => window.history.back()}>
               Go Back
@@ -361,8 +369,9 @@ export default function ClassesPage() {
                 <ClassCard
                   key={classData.id}
                   classData={classData}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
+                  onEdit={canManageClasses ? handleEdit : undefined}
+                  onDelete={canManageClasses ? handleDelete : undefined}
+                  canManage={canManageClasses}
                 />
               ))}
             </div>
@@ -377,7 +386,7 @@ export default function ClassesPage() {
                   ? "No classes match your filters. Try adjusting your search."
                   : "Get started by creating your first class."}
               </p>
-              {!hasActiveFilters && (
+              {!hasActiveFilters && canManageClasses && (
                 <Button onClick={() => setCreateDialogOpen(true)} size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                   <Plus className="h-5 w-5 mr-2" />
                   Create Class
@@ -387,54 +396,62 @@ export default function ClassesPage() {
           )}
 
           {/* Floating Action Button */}
-          <button
-            onClick={() => setCreateDialogOpen(true)}
-            className="fixed bottom-20 md:bottom-8 right-4 md:right-8 h-16 w-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-2xl hover:shadow-3xl transition-all flex items-center justify-center z-40 group"
-            aria-label="Create class"
-          >
-            <Plus className="h-7 w-7 group-hover:rotate-90 transition-transform" />
-          </button>
+          {canManageClasses && (
+            <button
+              onClick={() => setCreateDialogOpen(true)}
+              className="fixed bottom-20 md:bottom-8 right-4 md:right-8 h-16 w-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-2xl hover:shadow-3xl transition-all flex items-center justify-center z-40 group"
+              aria-label="Create class"
+            >
+              <Plus className="h-7 w-7 group-hover:rotate-90 transition-transform" />
+            </button>
+          )}
 
           {/* Dialogs */}
-          <CreateClassDialog
-            open={createDialogOpen}
-            onOpenChange={setCreateDialogOpen}
-            onSuccess={handleCreateSuccess}
-          />
+          {canManageClasses && (
+            <CreateClassDialog
+              open={createDialogOpen}
+              onOpenChange={setCreateDialogOpen}
+              onSuccess={handleCreateSuccess}
+            />
+          )}
 
-          <EditClassDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            onSuccess={handleEditSuccess}
-            classData={selectedClass}
-          />
+          {canManageClasses && (
+            <EditClassDialog
+              open={editDialogOpen}
+              onOpenChange={setEditDialogOpen}
+              onSuccess={handleEditSuccess}
+              classData={selectedClass}
+            />
+          )}
 
           {/* Delete Confirmation Dialog */}
-          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Class</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this class? This will mark it as inactive.
-                  {selectedClass && (
-                    <span className="block mt-2 font-semibold text-foreground">
-                      &ldquo;{selectedClass.name}&rdquo;
-                    </span>
-                  )}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleteClass.isPending}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteConfirm}
-                  disabled={deleteClass.isPending}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {deleteClass.isPending ? "Deleting..." : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {canManageClasses && (
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Class</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this class? This will mark it as inactive.
+                    {selectedClass && (
+                      <span className="block mt-2 font-semibold text-foreground">
+                        &ldquo;{selectedClass.name}&rdquo;
+                      </span>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleteClass.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteConfirm}
+                    disabled={deleteClass.isPending}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {deleteClass.isPending ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
     </AppLayout>

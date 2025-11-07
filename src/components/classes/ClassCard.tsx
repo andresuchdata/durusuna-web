@@ -29,6 +29,7 @@ interface ClassCardProps {
   onEdit?: (classData: Class) => void;
   onDelete?: (classData: Class) => void;
   onViewDetails?: (classData: Class) => void;
+  canManage?: boolean;
 }
 
 // Vibrant gradient colors for class cards
@@ -49,7 +50,7 @@ function getGradient(id: string): string {
   return gradients[hash % gradients.length];
 }
 
-export function ClassCard({ classData, onEdit, onDelete, onViewDetails }: ClassCardProps) {
+export function ClassCard({ classData, onEdit, onDelete, onViewDetails, canManage = true }: ClassCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
   const gradient = getGradient(classData.id);
@@ -82,37 +83,39 @@ export function ClassCard({ classData, onEdit, onDelete, onViewDetails }: ClassC
         </div>
 
         {/* Actions menu */}
-        <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMenuOpen(false); router.push(`/classes/${classData.id}`); }}>
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(classData); }}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(classData); }}
-                className="text-red-600 focus:text-red-600"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {canManage && (
+          <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMenuOpen(false); router.push(`/classes/${classData.id}`); }}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit?.(classData); }}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete?.(classData); }}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
 
         {/* Class icon */}
         <div className="absolute bottom-3 left-3">
