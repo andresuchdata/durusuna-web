@@ -4,37 +4,87 @@ import { useEffect, useRef } from "react";
 import { getSocket } from "@/core/realtime/socket";
 import type { Message } from "./types";
 
+type BackendReplyTo = {
+  id: string;
+  content?: string | null;
+  sender_name?: string | null;
+  sender_id?: string | null;
+  message_type?: string | null;
+};
+
+type BackendMessage = {
+  id: string;
+  conversation_id?: string | null;
+  conversationId?: string | null;
+  sender_id?: string | null;
+  senderId?: string | null;
+  sender?: Message["sender"];
+  content?: string | null;
+  text?: string | null;
+  attachments?: Message["attachments"];
+  created_at?: string;
+  createdAt?: string;
+  read_status?: "read" | "delivered" | "sent" | null;
+  reactions?: Message["reactions"];
+  reply_to_id?: string;
+  reply_to?: BackendReplyTo | null;
+  message_type?: string;
+};
+
+type MessageNewEvent = {
+  conversationId?: string;
+  conversation_id?: string;
+  message?: BackendMessage;
+};
+
+type TypingEvent = {
+  conversationId?: string;
+  conversation_id?: string;
+  userId?: string;
+  user_id?: string;
+};
+
+type ReactionUpdateEvent = {
+  conversationId?: string;
+  conversation_id?: string;
+  messageId?: string;
+  message_id?: string;
+  reactions?: Record<string, string[]>;
+};
+
 // Transform backend message format to frontend format
-function transformMessage(backendMessage: any): Message {
+function transformMessage(backendMessage: BackendMessage): Message {
   // Explicitly handle reply_to to ensure it's properly preserved
   let reply_to: Message['reply_to'] = undefined;
   if (backendMessage.reply_to) {
     reply_to = {
       id: backendMessage.reply_to.id,
-      content: backendMessage.reply_to.content || '',
-      sender_name: backendMessage.reply_to.sender_name || '',
-      sender_id: backendMessage.reply_to.sender_id,
-      message_type: backendMessage.reply_to.message_type,
+      content: backendMessage.reply_to.content ?? '',
+      sender_name: backendMessage.reply_to.sender_name ?? '',
+      sender_id: backendMessage.reply_to.sender_id ?? undefined,
+      message_type: backendMessage.reply_to.message_type ?? undefined,
     };
   }
+
+  const messageContent = backendMessage.content ?? backendMessage.text ?? undefined;
 
   return {
     id: backendMessage.id,
     serverId: backendMessage.id,
-    conversationId: backendMessage.conversation_id || backendMessage.conversationId,
-    conversation_id: backendMessage.conversation_id,
-    senderId: backendMessage.sender_id || backendMessage.senderId,
-    sender_id: backendMessage.sender_id,
+    conversationId: backendMessage.conversation_id ?? backendMessage.conversationId ?? undefined,
+    conversation_id: backendMessage.conversation_id ?? undefined,
+    senderId: backendMessage.sender_id ?? backendMessage.senderId ?? undefined,
+    sender_id: backendMessage.sender_id ?? undefined,
     sender: backendMessage.sender,
-    text: backendMessage.content || backendMessage.text,
-    content: backendMessage.content || backendMessage.text,
-    attachments: backendMessage.attachments || [],
-    createdAt: backendMessage.created_at || backendMessage.createdAt,
-    created_at: backendMessage.created_at,
+    text: messageContent,
+    content: messageContent,
+    attachments: backendMessage.attachments ?? [],
+    createdAt: backendMessage.created_at ?? backendMessage.createdAt,
+    created_at: backendMessage.created_at ?? undefined,
     status: backendMessage.read_status === 'read' ? 'read' : 
             backendMessage.read_status === 'delivered' ? 'delivered' : 'sent',
-    reactions: backendMessage.reactions || {},
-    reply_to_id: backendMessage.reply_to_id, // Preserve reply_to_id for frontend population
+    reactions: backendMessage.reactions ?? {},
+    reply_to_id: backendMessage.reply_to_id ?? undefined, // Preserve reply_to_id for frontend population
     reply_to: reply_to,
     message_type: backendMessage.message_type, // Preserve message_type for populating reply_to
   };
@@ -74,15 +124,15 @@ export function useChatRealtime(
       socket.once('connect', joinRoom);
     }
 
-    function onMessageNew(data: any) {
-      const msgConvId = data?.conversationId || data?.conversation_id || data?.message?.conversation_id;
+    function onMessageNew(data: MessageNewEvent) {
+      const msgConvId = data.conversationId || data.conversation_id || data.message?.conversation_id;
       if (msgConvId !== conversationId) {
         console.log('[Realtime] Message not for this conversation', { msgConvId, conversationId });
         return;
       }
       
       // Transform backend message format to frontend format
-      const backendMessage = data?.message;
+      const backendMessage = data.message;
       if (!backendMessage) {
         console.warn('[Realtime] No message in data');
         return;
@@ -92,20 +142,26 @@ export function useChatRealtime(
       handlersRef.current.onMessageNew?.(transformedMessage);
     }
 
-    function onTypingStart(data: any) {
-      if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
-      handlersRef.current.onTypingStart?.(data?.userId || data?.user_id);
+    function onTypingStart(data: TypingEvent) {
+      if (data.conversationId !== conversationId && data.conversation_id !== conversationId) return;
+      const userId = data.userId || data.user_id;
+      if (userId) {
+        handlersRef.current.onTypingStart?.(userId);
+      }
     }
 
-    function onTypingStop(data: any) {
-      if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
-      handlersRef.current.onTypingStop?.(data?.userId || data?.user_id);
+    function onTypingStop(data: TypingEvent) {
+      if (data.conversationId !== conversationId && data.conversation_id !== conversationId) return;
+      const userId = data.userId || data.user_id;
+      if (userId) {
+        handlersRef.current.onTypingStop?.(userId);
+      }
     }
 
-    function onReactionUpdate(data: any) {
-      if (data?.conversationId !== conversationId && data?.conversation_id !== conversationId) return;
-      const messageId = data?.messageId || data?.message_id;
-      const reactions: Record<string, string[]> = data?.reactions ?? {};
+    function onReactionUpdate(data: ReactionUpdateEvent) {
+      if (data.conversationId !== conversationId && data.conversation_id !== conversationId) return;
+      const messageId = data.messageId || data.message_id;
+      const reactions: Record<string, string[]> = data.reactions ?? {};
       if (messageId) {
         handlersRef.current.onReactionUpdate?.(messageId, reactions);
       }

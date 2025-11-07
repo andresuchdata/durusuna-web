@@ -111,7 +111,7 @@ export function ForwardMessageDialog({
                       }`}
                     >
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={displayAvatar} alt={displayName} />
+                        <AvatarImage src={displayAvatar ?? undefined} alt={displayName} />
                         <AvatarFallback className="bg-emerald-600 text-white">
                           {initials}
                         </AvatarFallback>
