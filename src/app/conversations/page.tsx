@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
@@ -20,12 +21,30 @@ import { AnimatePresence, motion } from "framer-motion";
 export default function ChatsPage() {
   const { data, isLoading, error } = useConversations();
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  
+  // Initialize selectedId from URL parameter or null
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    // Only read from URL on initial render
+    return searchParams.get('selected');
+  });
+  
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [typingInConversations, setTypingInConversations] = useState<Set<string>>(new Set());
   const selectedConversation = data?.find(c => c.id === selectedId);
   const { toggleMobileSidebar } = useSidebar();
   const { mutate: markAsRead } = useMarkConversationAsRead();
+
+  // Clear URL parameter when conversation is selected from URL
+  useEffect(() => {
+    const selectedFromUrl = searchParams.get('selected');
+    if (selectedFromUrl && selectedId === selectedFromUrl) {
+      // Clear the URL parameter after the component has mounted with the selection
+      const url = new URL(window.location.href);
+      url.searchParams.delete('selected');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams, selectedId]);
 
   // Join all conversation rooms on mount
   useEffect(() => {
@@ -170,8 +189,8 @@ export default function ChatsPage() {
       <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'} overflow-x-hidden`}>
         {/* Conversations List */}
         <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
-          {/* WhatsApp-style Header */}
-          <div className="bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between">
+          {/* WhatsApp-style Header - Hidden on mobile when conversation selected, always visible on desktop */}
+          <div className={`bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between ${selectedId ? 'hidden md:flex' : 'flex'}`}>
             <h1 className="text-xl font-semibold text-white">Chats</h1>
             <div className="flex items-center gap-4">
               <Button 
@@ -189,8 +208,8 @@ export default function ChatsPage() {
             </div>
           </div>
           
-          {/* Search Bar */}
-          <div className="p-2 bg-white dark:bg-[#111b21]">
+          {/* Search Bar - Hidden on mobile when conversation selected, always visible on desktop */}
+          <div className={`p-2 bg-white dark:bg-[#111b21] ${selectedId ? 'hidden md:block' : 'block'}`}>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -444,7 +463,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
       return;
     }
     mutateFn({ messageId, emoji });
-  }, [conversationId]);
+  }, []);
 
   async function onSend(e: React.FormEvent) {
     e.preventDefault();

@@ -51,8 +51,8 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
         participant_ids: [contact.id],
       });
 
-      // Navigate to the conversation
-      router.push(`/conversations/${conversation.id}`);
+      // Navigate back to conversations page with the new conversation selected
+      router.push(`/conversations?selected=${conversation.id}`);
       
       // Close dialog
       onClose();
