@@ -15,10 +15,9 @@ import {
   useBatchCreateUsers,
   useCreateUser,
   useDeleteUser,
-  useUpdateUser,
   useUsers,
 } from "@/domains/users/hooks";
-import type { User, CreateUserPayload, UpdateUserPayload } from "@/domains/users/types";
+import type { User } from "@/domains/users/types";
 import { useToast } from "@/components/ui/use-toast";
 
 type UserTypeFilter = "all" | "teacher" | "student" | "parent" | "admin";
@@ -68,10 +67,9 @@ export default function UsersPage() {
   const canEdit = isAdmin || isTeacher;
   const canDelete = isAdmin;
 
-  const handleCreate = async (payload: CreateUserPayload | UpdateUserPayload) => {
+  const handleCreate = async (payload: Parameters<typeof createUser.mutateAsync>[0]) => {
     try {
-      // In create mode, payload is always CreateUserPayload
-      await createUser.mutateAsync(payload as CreateUserPayload);
+      await createUser.mutateAsync(payload);
       toast({ title: "User created", description: "The new user can now access the platform." });
     } catch (error) {
       toast({ title: "Failed to create user", description: (error as Error).message, variant: "destructive" });
@@ -104,7 +102,9 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    setPage(1);
+    setTimeout(() => {
+      setPage(1);
+    }, 0);
   }, [debouncedSearch, userType, isActive, dobFrom, dobTo]);
 
   if (profileLoading) {

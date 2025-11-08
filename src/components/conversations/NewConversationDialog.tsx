@@ -11,7 +11,7 @@ import { useContacts } from "@/domains/users/hooks";
 import { useCreateConversation } from "@/domains/chat/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import type { User } from "@/domains/users/types";
+import type { Contact } from "@/domains/users/types";
 import { useRouter } from "next/navigation";
 
 type NewConversationDialogProps = {
@@ -40,7 +40,7 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
     );
   }, [data, searchQuery]);
 
-  const handleSelectContact = async (contact: User) => {
+  const handleSelectContact = async (contact: Contact) => {
     try {
       // Set the selected contact to show loading indicator
       setSelectedContactId(contact.id);
@@ -177,7 +177,7 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Avatar className="h-12 w-12 flex-shrink-0">
-                    <AvatarImage src={contact.avatar_url} alt={`${contact.first_name} ${contact.last_name}`} />
+                    <AvatarImage src={contact.avatar_url || undefined} alt={`${contact.first_name} ${contact.last_name}`} />
                     <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
                       {contact.first_name[0]}{contact.last_name[0]}
                     </AvatarFallback>
@@ -187,9 +187,11 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
                       <p className="font-medium text-sm truncate">
                         {contact.first_name} {contact.last_name}
                       </p>
-                      <Badge className={`text-xs px-2 py-0 ${getUserTypeColor(contact.user_type)}`}>
-                        {getUserTypeLabel(contact.user_type)}
-                      </Badge>
+                      {contact.user_type && (
+                        <Badge className={`text-xs px-2 py-0 ${getUserTypeColor(contact.user_type)}`}>
+                          {getUserTypeLabel(contact.user_type)}
+                        </Badge>
+                      )}
                     </div>
                     {contact.email && (
                       <p className="text-xs text-muted-foreground truncate">

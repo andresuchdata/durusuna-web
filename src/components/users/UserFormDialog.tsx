@@ -10,25 +10,29 @@ import {
 import { UserForm } from "./UserForm";
 import type { CreateUserPayload, UpdateUserPayload, User } from "@/domains/users/types";
 
-type UserFormDialogProps = {
-  mode: "create" | "edit";
+type BaseUserFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (payload: CreateUserPayload | UpdateUserPayload) => Promise<void> | void;
   initialData?: User | null;
   isSubmitting: boolean;
   canEditRole: boolean;
 };
 
-export function UserFormDialog({
-  mode,
-  open,
-  onOpenChange,
-  onSubmit,
-  initialData,
-  isSubmitting,
-  canEditRole,
-}: UserFormDialogProps) {
+type CreateUserFormDialogProps = BaseUserFormDialogProps & {
+  mode: "create";
+  onSubmit: (payload: CreateUserPayload) => Promise<void> | void;
+};
+
+type EditUserFormDialogProps = BaseUserFormDialogProps & {
+  mode: "edit";
+  onSubmit: (payload: UpdateUserPayload) => Promise<void> | void;
+};
+
+type UserFormDialogProps = CreateUserFormDialogProps | EditUserFormDialogProps;
+
+export function UserFormDialog(props: UserFormDialogProps) {
+  const { mode, open, onOpenChange, onSubmit, initialData, isSubmitting, canEditRole } = props;
+  
   const dialogTitle = mode === "create" ? "Create new user" : "Edit user";
   const dialogDescription =
     mode === "create"
@@ -36,7 +40,11 @@ export function UserFormDialog({
       : "Update the user information for this member.";
 
   const handleFormSubmit = async (payload: CreateUserPayload | UpdateUserPayload) => {
-    await onSubmit(payload);
+    if (mode === "create") {
+      await (onSubmit as (payload: CreateUserPayload) => Promise<void> | void)(payload as CreateUserPayload);
+    } else {
+      await (onSubmit as (payload: UpdateUserPayload) => Promise<void> | void)(payload as UpdateUserPayload);
+    }
     onOpenChange(false);
   };
 
