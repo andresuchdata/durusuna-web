@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { UserDetailCard } from "@/components/users/UserDetailCard";
 import { Card } from "@/components/ui/card";
@@ -11,14 +11,9 @@ import { useProfile } from "@/domains/auth/hooks";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser } from "@/domains/users/hooks";
 
-type UserDetailPageProps = {
-  params: {
-    id: string;
-  };
-};
-
-export default function UserDetailPage({ params }: UserDetailPageProps) {
-  const { id } = params;
+export default function UserDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id as string;
   const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { toast } = useToast();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { UserForm } from "@/components/users/UserForm";
 import { Card } from "@/components/ui/card";
@@ -11,14 +11,9 @@ import { useProfile } from "@/domains/auth/hooks";
 import { useToast } from "@/components/ui/use-toast";
 import { useUpdateUser, useUser } from "@/domains/users/hooks";
 
-type UserEditPageProps = {
-  params: {
-    id: string;
-  };
-};
-
-export default function UserEditPage({ params }: UserEditPageProps) {
-  const { id } = params;
+export default function UserEditPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id as string;
   const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { toast } = useToast();
