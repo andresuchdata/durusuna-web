@@ -30,12 +30,18 @@ export default function ProfilePage() {
 
   if (!profile) return null;
 
-  const initials = profile.name
-    ?.split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U";
+  const firstName = profile.first_name ?? profile.name?.split(" ")?.[0] ?? "";
+  const lastName = profile.last_name ?? profile.name?.split(" ")?.slice(1).join(" ") ?? "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || profile.name || profile.email;
+  const initials = (firstName + lastName)
+    ? `${firstName}${lastName}`
+        .replace(/\s+/g, "")
+        .slice(0, 2)
+        .toUpperCase()
+    : profile.email.slice(0, 2).toUpperCase();
+  const avatarUrl = profile.avatar_url ?? profile.avatarUrl ?? undefined;
+  const roleLabel = profile.role === "admin" ? "Administrator" : "User";
+  const userTypeLabel = profile.user_type ? profile.user_type.charAt(0).toUpperCase() + profile.user_type.slice(1) : "—";
 
   return (
     <AppLayout>
@@ -51,15 +57,15 @@ export default function ProfilePage() {
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={profile.avatarUrl} />
+                  <AvatarImage src={avatarUrl} />
                   <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 text-2xl">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-xl font-semibold">{profile.name}</h2>
+                  <h2 className="text-xl font-semibold">{fullName}</h2>
                   <p className="text-muted-foreground">{profile.email}</p>
-                  <p className="text-sm text-muted-foreground mt-1 capitalize">{profile.role || "User"}</p>
+                  <p className="text-sm text-muted-foreground mt-1 capitalize">{userTypeLabel}</p>
                 </div>
               </div>
 
@@ -67,6 +73,14 @@ export default function ProfilePage() {
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">User ID</span>
                   <p className="font-mono text-sm">{profile.id}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">First Name</span>
+                  <p className="text-sm">{firstName || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Last Name</span>
+                  <p className="text-sm">{lastName || "—"}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">Email</span>
@@ -77,10 +91,14 @@ export default function ProfilePage() {
                   <p className="text-sm">{profile.phone || "Not provided"}</p>
                 </div>
                 <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Role</span>
+                  <p className="text-sm">{roleLabel}</p>
+                </div>
+                <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">Status</span>
                   <p className="text-sm">
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      Active
+                      {(profile.is_active ?? true) ? "Active" : "Inactive"}
                     </span>
                   </p>
                 </div>

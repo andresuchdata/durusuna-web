@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/domains/auth/hooks";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, BookOpen, User, LogOut, Menu, X, Users, ClipboardCheck, FileText, GraduationCap } from "lucide-react";
+import { MessageSquare, BookOpen, User, LogOut, Menu, X, Users, ClipboardCheck, FileText, GraduationCap, UserCog } from "lucide-react";
 import { tokenStore } from "@/core/auth/token";
 import { useEffect, useState } from "react";
 import { TopHeader } from "./TopHeader";
@@ -53,6 +53,12 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
     router.push("/login");
   };
 
+  const firstName = profile.first_name ?? profile.name?.split(" ")?.[0] ?? "";
+  const lastName = profile.last_name ?? profile.name?.split(" ")?.slice(1).join(" ") ?? "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || profile.name || profile.email;
+  const isAdmin = profile.role === "admin" || profile.user_type === "admin";
+  const isTeacher = profile.user_type === "teacher";
+
   const navItems = [
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/class-updates", label: "Updates", icon: BookOpen },
@@ -60,6 +66,7 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
     { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
     { href: "/assignments", label: "Assignments", icon: FileText },
     { href: "/grades", label: "Grades", icon: GraduationCap },
+    ...(isAdmin || isTeacher ? [{ href: "/users", label: "Users", icon: UserCog }] : []),
     { href: "/profile", label: "Profile", icon: User },
   ];
 
@@ -102,7 +109,7 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
             <div className={`flex items-center mb-4 pt-2 h-10 ${sidebarCollapsed ? 'justify-center' : ''}`}>
               {!sidebarCollapsed && (
                 <div className="flex-1 overflow-hidden">
-                  <p className="text-sm text-blue-200 truncate">{profile.name}</p>
+                  <p className="text-sm text-blue-200 truncate">{fullName}</p>
                 </div>
               )}
               {/* Desktop only hamburger toggle */}
@@ -184,7 +191,7 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-xl font-bold text-white">Durusuna</h1>
-                <p className="text-sm text-blue-200">{profile.name}</p>
+                <p className="text-sm text-blue-200">{fullName}</p>
               </div>
               <Button
                 variant="ghost"

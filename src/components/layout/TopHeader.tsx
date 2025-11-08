@@ -22,12 +22,15 @@ export function TopHeader({
   
   if (!profile) return null;
 
-  const initials = profile.name
-    ?.split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U";
+  const firstName = profile.first_name ?? profile.name?.split(" ")?.[0] ?? "";
+  const lastName = profile.last_name ?? profile.name?.split(" ")?.slice(1).join(" ") ?? "";
+  const initials = (firstName + lastName)
+    ? `${firstName}${lastName}`
+        .replace(/\s+/g, "")
+        .slice(0, 2)
+        .toUpperCase()
+    : profile.email.slice(0, 2).toUpperCase();
+  const avatarUrl = profile.avatar_url ?? profile.avatarUrl ?? undefined;
 
   // TODO: Fetch actual unread count from class updates
   const unreadClassUpdates = 0;
@@ -64,7 +67,7 @@ export function TopHeader({
           {/* Profile Avatar */}
           <Link href="/profile">
             <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-slate-300 transition-all">
-              <AvatarImage src={profile.avatarUrl} />
+              <AvatarImage src={avatarUrl} />
               <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
                 {initials}
               </AvatarFallback>
