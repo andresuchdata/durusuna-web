@@ -403,10 +403,10 @@ export default function ChatDetailPage() {
           </Avatar>
         </button>
         
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <button 
             onClick={handleHeaderAvatarClick}
-            className="font-semibold text-sm md:text-lg hover:underline text-left truncate block w-full"
+            className="font-semibold text-sm md:text-base hover:underline text-left truncate block w-full max-w-full"
           >
             {headerName}
           </button>

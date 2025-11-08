@@ -167,7 +167,7 @@ export default function ChatsPage() {
 
   return (
     <AppLayout hideBottomNav={!!selectedId}>
-      <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'}`}>
+      <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'} overflow-x-hidden`}>
         {/* Conversations List */}
         <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
           {/* WhatsApp-style Header */}
@@ -244,11 +244,11 @@ export default function ChatsPage() {
         </div>
 
         {/* Conversation Detail or Empty State */}
-        <div className={`flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a] ${selectedId ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a] ${selectedId ? 'flex' : 'hidden md:flex'} overflow-x-hidden min-h-0`}>
           {selectedId && selectedConversation ? (
             <>
               {/* WhatsApp-style Conversation Header - Sticky */}
-              <div className="sticky top-0 z-10 bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942]">
+              <div className="sticky top-0 z-10 bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942] overflow-hidden w-full max-w-full">
                 {/* Back button for mobile */}
                 <Button 
                   variant="ghost" 
@@ -275,24 +275,24 @@ export default function ChatsPage() {
                   </AvatarFallback>
                 </Avatar>
                 
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-sm md:text-base truncate">
+                <div className="flex-1 min-w-0 max-w-full overflow-hidden pr-2">
+                  <h2 className="font-semibold text-sm md:text-base truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">
                     {selectedConversation.type === 'direct' && selectedConversation.other_user
                       ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
                       : selectedConversation.name || 'Conversation'}
                   </h2>
-                  <p className="text-xs text-muted-foreground">online</p>
+                  <p className="text-xs text-muted-foreground truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">online</p>
                 </div>
                 
                 <div className="flex items-center gap-1 md:gap-2 shrink-0">
                   {/* Hide video/phone on mobile */}
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0">
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0 shrink-0">
                     <Video className="h-5 w-5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0">
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0 shrink-0">
                     <Phone className="h-5 w-5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0">
                     <Search className="h-5 w-5" />
                   </Button>
                   
@@ -300,14 +300,14 @@ export default function ChatsPage() {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="md:hidden h-9 w-9 p-0"
+                    className="md:hidden h-9 w-9 p-0 shrink-0"
                     onClick={toggleMobileSidebar}
                   >
                     <Menu className="h-5 w-5" />
                   </Button>
                   
                   {/* More menu - desktop only */}
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-9 w-9 p-0">
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-9 w-9 p-0 shrink-0">
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </div>
@@ -459,9 +459,9 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full min-h-0">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a]">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a] min-h-0">
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading messages…</div>
         ) : error ? (

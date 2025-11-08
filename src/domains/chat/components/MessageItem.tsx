@@ -123,7 +123,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         </Avatar>
       )}
 
-      <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%] w-full`}>
+      <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%] w-full min-w-0`}>
         {/* Sender name for others' messages (only in group chats) */}
         {!isMine && conversationType === "group" && (
           <span className="text-xs text-muted-foreground mb-0.5 px-2">
@@ -132,10 +132,10 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         )}
 
         {/* Message bubble */}
-        <div className="relative w-full max-w-full">
+        <div className="relative w-full max-w-full min-w-0">
           {/* Main message */}
           <div
-            className={`rounded-2xl shadow-sm w-full max-w-full ${
+            className={`rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden ${
               isMine
                 ? "bg-emerald-100 text-gray-900 rounded-br-sm"
                 : "bg-white dark:bg-[#134e3a] text-foreground dark:text-white rounded-bl-sm"
@@ -195,11 +195,11 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             )}
 
             {messageText && (
-              <p className="text-sm break-words whitespace-pre-wrap">{messageText}</p>
+              <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere">{messageText}</p>
             )}
             
-            <div className="flex items-center justify-end gap-1 mt-1">
-              <span className="text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-end gap-1 mt-1 flex-shrink-0">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                 {new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {isMine && m.status && (
@@ -221,20 +221,25 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className={`absolute -bottom-3 ${isMine ? "right-2" : "left-2"} bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 flex items-center gap-1 shadow-md`}
+              className={`absolute -bottom-3 ${isMine ? "right-2" : "left-2"} bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 shadow-md`}
+              style={{ 
+                maxWidth: 'calc(100% - 0.5rem)'
+              }}
             >
-              {reactionCounts.map(({ emoji, count, hasReacted }) => (
-                <motion.button
-                  key={emoji}
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => handleReaction(emoji)}
-                  className={`flex items-center gap-0.5 ${hasReacted ? "font-semibold" : ""}`}
-                >
-                  <span className="text-sm">{emoji}</span>
-                  <span className="text-xs text-muted-foreground">{count}</span>
-                </motion.button>
-              ))}
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide" style={{ maxWidth: '100%' }}>
+                {reactionCounts.map(({ emoji, count, hasReacted }) => (
+                  <motion.button
+                    key={emoji}
+                    whileHover={{ scale: 1.2 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleReaction(emoji)}
+                    className={`flex items-center gap-0.5 flex-shrink-0 ${hasReacted ? "font-semibold" : ""}`}
+                  >
+                    <span className="text-sm">{emoji}</span>
+                    <span className="text-xs text-muted-foreground">{count}</span>
+                  </motion.button>
+                ))}
+              </div>
             </motion.div>
           )}
 
