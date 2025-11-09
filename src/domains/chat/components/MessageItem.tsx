@@ -27,6 +27,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
   const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const [isSelected, setIsSelected] = useState(false);
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressThreshold = 500; // 500ms for long press
@@ -60,7 +62,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
 
   // Handle closing actions when clicking outside on mobile
   useEffect(() => {
-    if (!isMobile || !showActions) return;
+    if (!isMobile || (!showActions && !isSelected)) return;
 
     const handleClickOutside = (event: Event) => {
       const target = event.target as Element;
@@ -71,6 +73,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       if (!messageElement && !actionsElement) {
         setShowActions(false);
         setShowReactionPicker(false);
+        setIsSelected(false);
+        setIsLongPressing(false);
       }
     };
 
@@ -82,7 +86,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [isMobile, showActions, m.id]);
+  }, [isMobile, showActions, isSelected, m.id]);
   
   const senderId = m.sender_id || m.senderId || m.sender?.id;
   const isMine = senderId === me;
@@ -108,6 +112,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   const handleCopy = () => {
     navigator.clipboard.writeText(messageText);
     setShowActions(false);
+    setIsSelected(false);
+    setIsLongPressing(false);
   };
 
   const handleReaction = (emoji: string) => {
@@ -127,6 +133,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       console.error("Error calling onReact:", error);
     }
     setShowReactionPicker(false);
+    // Keep actions open for potential additional reactions, but close other states
+    setIsLongPressing(false);
   };
 
   // Count reactions - handle both formats:
@@ -166,8 +174,13 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     const touch = e.touches[0];
     touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     
+    // Set long pressing state for visual feedback
+    setIsLongPressing(true);
+    
     // Don't prevent default to allow scrolling
     longPressTimer.current = setTimeout(() => {
+      setIsLongPressing(false);
+      setIsSelected(true);
       setShowActions(true);
       // Add haptic feedback if supported
       if ('vibrate' in navigator) {
@@ -176,10 +189,13 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     }, longPressThreshold);
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = () => {
     if (!isMobile) return;
     
     const hadTimer = longPressTimer.current !== null;
+    
+    // Clear long pressing state
+    setIsLongPressing(false);
     
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -207,6 +223,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
     
     if (deltaX > moveThreshold || deltaY > moveThreshold) {
+      // Clear visual feedback states
+      setIsLongPressing(false);
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
       touchStartPos.current = null;
@@ -217,7 +235,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"} group`}
+      className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"} group mobile-optimized`}
       data-message-id={m.id}
       // Desktop interactions (hover)
       onMouseEnter={() => !isMobile && setShowActions(true)}
@@ -235,7 +253,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       onClick={(e) => {
         if (isMobile) {
           // On mobile, clicks should close actions if they're open
-          if (showActions) {
+          if (showActions || isSelected) {
             const target = e.target as Element;
             const actionsElement = target.closest('[data-message-actions]');
             
@@ -243,6 +261,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             if (!actionsElement) {
               setShowActions(false);
               setShowReactionPicker(false);
+              setIsSelected(false);
+              setIsLongPressing(false);
             }
           }
         }
@@ -265,7 +285,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%] w-full min-w-0`}>
         {/* Sender name for others' messages (only in group chats) */}
         {!isMine && conversationType === "group" && (
-          <span className="text-xs text-muted-foreground mb-0.5 px-2">
+          <span className="text-xs text-muted-foreground mb-0.5 px-2 select-none touch-manipulation">
             {senderName}
           </span>
         )}
@@ -274,11 +294,31 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         <div className="relative w-full max-w-full min-w-0">
           {/* Main message */}
           <div
-            className={`rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden ${
-              isMine
-                ? "bg-emerald-100 text-gray-900 rounded-br-sm"
-                : "bg-white dark:bg-[#134e3a] text-foreground dark:text-white rounded-bl-sm"
-            } ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}`}
+            className={`
+              message-bubble rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden 
+              transition-all duration-200
+              ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}
+              ${
+                // Base colors
+                isMine
+                  ? "text-gray-900 rounded-br-sm"
+                  : "text-foreground dark:text-white rounded-bl-sm"
+              }
+              ${
+                // Background colors with selection states
+                isLongPressing
+                  ? (isMine 
+                      ? "bg-emerald-200 shadow-lg" 
+                      : "bg-gray-200 dark:bg-[#0f3d2f] shadow-lg")
+                  : (showActions || isSelected) && isMobile
+                    ? (isMine 
+                        ? "bg-emerald-200 ring-2 ring-emerald-300" 
+                        : "bg-gray-100 dark:bg-[#1a4a3a] ring-2 ring-gray-300 dark:ring-emerald-400")
+                    : (isMine
+                        ? "bg-emerald-100"
+                        : "bg-white dark:bg-[#134e3a]")
+              }
+            `}
           >
             {/* Reply indicator - WhatsApp style - INSIDE the bubble */}
             {m.reply_to && (
@@ -303,15 +343,15 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                 }}
               >
                 {/* Reply content */}
-                <div className="flex-1 min-w-0 w-full overflow-hidden">
-                  <div className={`text-xs font-semibold mb-0.5 truncate ${
+                <div className="flex-1 min-w-0 w-full overflow-hidden select-none">
+                  <div className={`text-xs font-semibold mb-0.5 truncate select-none ${
                     isMine 
                       ? "text-emerald-900" 
                       : "text-emerald-600 dark:text-emerald-400"
                   }`}>
                     {m.reply_to.sender_name}
                   </div>
-                  <div className={`text-xs line-clamp-2 ${
+                  <div className={`text-xs line-clamp-2 select-none ${
                     isMine 
                       ? "text-gray-800" 
                       : "text-gray-600 dark:text-gray-400"
@@ -335,11 +375,11 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             )}
 
             {messageText && (
-              <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere">{messageText}</p>
+              <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere select-none touch-manipulation">{messageText}</p>
             )}
             
-            <div className="flex items-center justify-end gap-1 mt-1 flex-shrink-0">
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+            <div className="flex items-center justify-end gap-1 mt-1 flex-shrink-0 select-none">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap select-none touch-manipulation">
                 {new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {isMine && m.status && (
@@ -366,7 +406,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                 maxWidth: 'calc(100% - 0.5rem)'
               }}
             >
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide" style={{ maxWidth: '100%' }}>
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide select-none" style={{ maxWidth: '100%' }}>
                 {reactionCounts.map(({ emoji, count, hasReacted }) => (
                   <motion.button
                     key={emoji}
@@ -376,10 +416,10 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                       e.stopPropagation(); // Prevent message click handler
                       handleReaction(emoji);
                     }}
-                    className={`flex items-center gap-0.5 flex-shrink-0 ${hasReacted ? "font-semibold" : ""}`}
+                    className={`flex items-center gap-0.5 flex-shrink-0 select-none touch-manipulation ${hasReacted ? "font-semibold" : ""}`}
                   >
-                    <span className="text-sm">{emoji}</span>
-                    <span className="text-xs text-muted-foreground">{count}</span>
+                    <span className="text-sm select-none">{emoji}</span>
+                    <span className="text-xs text-muted-foreground select-none">{count}</span>
                   </motion.button>
                 ))}
               </div>
@@ -393,17 +433,27 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                 onReply={() => {
                   onReply?.(m);
                   setShowActions(false);
+                  setIsSelected(false);
+                  setIsLongPressing(false);
                 }}
                 onReact={() => setShowReactionPicker(!showReactionPicker)}
                 onForward={() => {
                   onForward?.(m.id);
                   setShowActions(false);
+                  setIsSelected(false);
+                  setIsLongPressing(false);
                 }}
                 onDelete={() => {
                   onDelete?.(m.id);
                   setShowActions(false);
+                  setIsSelected(false);
+                  setIsLongPressing(false);
                 }}
-                onCopy={handleCopy}
+                onCopy={() => {
+                  handleCopy();
+                  setIsSelected(false);
+                  setIsLongPressing(false);
+                }}
                 isMine={isMine}
                 position={isMine ? "right" : "left"}
               />

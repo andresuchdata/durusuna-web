@@ -39,9 +39,9 @@ export function MessageActions({
       data-message-actions
       className={`absolute ${
         position === "right" ? "-top-10 right-0" : "-top-10 left-0"
-      } bg-white dark:bg-[#1f2c33] border border-border rounded-lg shadow-xl px-2 py-1.5 flex items-center gap-1 z-50`}
+      } bg-white dark:bg-[#1f2c33] border border-border rounded-lg shadow-xl px-2 py-1.5 flex items-center gap-1 z-50 select-none touch-manipulation`}
     >
-      {actions.map((action, idx) => {
+      {actions.map((action) => {
         const Icon = action.icon;
         return (
           <motion.button
@@ -49,7 +49,7 @@ export function MessageActions({
             whileHover={{ scale: 1.1, backgroundColor: action.danger ? "#fee2e2" : "#f3f4f6" }}
             whileTap={{ scale: 0.95 }}
             onClick={action.onClick}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-colors select-none touch-manipulation ${
               action.danger 
                 ? "hover:bg-red-50 dark:hover:bg-red-900/20" 
                 : "hover:bg-gray-100 dark:hover:bg-[#2a3942]"
