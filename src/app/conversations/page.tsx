@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
@@ -8,7 +8,7 @@ import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -16,9 +16,10 @@ import { getSocket } from "@/core/realtime/socket";
 import { Message, Conversation } from "@/domains/chat/types";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
+import { EmojiPickerComponent } from "@/domains/chat/components/EmojiPicker";
 import { AnimatePresence, motion } from "framer-motion";
 
-export default function ChatsPage() {
+function ChatsPageContent() {
   const { data, isLoading, error } = useConversations();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -376,6 +377,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [theirTyping, setTheirTyping] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const toggleReactionMutation = useToggleReaction(conversationId);
   const reactToMessage = toggleReactionMutation?.mutate;
@@ -385,6 +387,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   }, [reactToMessage]);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const { mutate: markAsReadInDetail } = useMarkConversationAsRead();
   
@@ -451,6 +454,24 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
       return () => clearTimeout(timer);
     }
   }, [items]);
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showEmojiPicker &&
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   const handleReact = useCallback((messageId: string, emoji: string) => {
     const mutateFn = reactToMessageRef.current;
@@ -587,32 +608,58 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
           )}
         </AnimatePresence>
 
-        <form onSubmit={onSend} className="p-3 md:p-4 flex gap-2">
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              setText(newValue);
-              
-              // Emit typing event DIRECTLY here
-              if (!isTyping && conversationId) {
-                setIsTyping(true);
+        <form onSubmit={onSend} className="p-3 md:p-4 flex gap-2 relative">
+          <div className="flex-1 relative">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 z-10"
+            >
+              <Smile className="h-4 w-4" />
+            </Button>
+            <input
+              ref={inputRef}
+              value={text}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                setText(newValue);
                 
-                const socket = getSocket();
-                if (socket.connected) {
-                  socket.emit("typing:start", { conversationId });
-                } else {
-                  socket.once('connect', () => {
+                // Emit typing event DIRECTLY here
+                if (!isTyping && conversationId) {
+                  setIsTyping(true);
+                  
+                  const socket = getSocket();
+                  if (socket.connected) {
                     socket.emit("typing:start", { conversationId });
-                  });
+                  } else {
+                    socket.once('connect', () => {
+                      socket.emit("typing:start", { conversationId });
+                    });
+                  }
                 }
-              }
-            }}
-            placeholder="Type a message"
-            className="flex-1 h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            disabled={isPending}
-          />
+              }}
+              placeholder="Type a message"
+              className="h-9 w-full rounded-md border border-input bg-transparent pl-10 pr-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              disabled={isPending}
+            />
+            
+            {/* Emoji Picker with proper z-index */}
+            {showEmojiPicker && (
+              <div ref={emojiPickerRef} className="absolute bottom-full mb-2 left-0 z-50">
+                <EmojiPickerComponent
+                  onSelectEmoji={(emoji) => {
+                    setText(prev => prev + emoji);
+                    setShowEmojiPicker(false);
+                    inputRef.current?.focus();
+                  }}
+                  onClose={() => setShowEmojiPicker(false)}
+                  position="top"
+                />
+              </div>
+            )}
+          </div>
           <Button type="submit" disabled={isPending || !text.trim()} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
             Send
           </Button>
@@ -627,4 +674,22 @@ import { useConversationMessages, useSendMessage, useMarkConversationAsRead, use
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";
+
+// Wrapper component with Suspense boundary
+export default function ChatsPage() {
+  return (
+    <Suspense fallback={
+      <AppLayout>
+        <div className="flex h-screen items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
+            <p className="text-sm text-muted-foreground">Loading conversations...</p>
+          </div>
+        </div>
+      </AppLayout>
+    }>
+      <ChatsPageContent />
+    </Suspense>
+  );
+}
 

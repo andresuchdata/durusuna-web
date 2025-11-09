@@ -36,6 +36,7 @@ export function MessageActions({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9, y: 5 }}
       transition={{ duration: 0.1 }}
+      data-message-actions
       className={`absolute ${
         position === "right" ? "-top-10 right-0" : "-top-10 left-0"
       } bg-white dark:bg-[#1f2c33] border border-border rounded-lg shadow-xl px-2 py-1.5 flex items-center gap-1 z-50`}

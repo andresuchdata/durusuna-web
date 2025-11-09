@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { Message } from "../types";
 import { Check, CheckCheck } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MessageActions } from "./MessageActions";
 import { ReactionPicker } from "./ReactionPicker";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,6 +26,63 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
   const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressThreshold = 500; // 500ms for long press
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkIsMobile = () => {
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth <= 1024; // Increased threshold to include tablets
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      
+      setIsMobile(isTouchDevice && (isSmallScreen || isMobileUA));
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  // Cleanup long press timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+
+  // Handle closing actions when clicking outside on mobile
+  useEffect(() => {
+    if (!isMobile || !showActions) return;
+
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as Element;
+      const messageElement = target.closest(`[data-message-id="${m.id}"]`);
+      const actionsElement = target.closest('[data-message-actions]');
+      
+      // Only close if click is completely outside this message and its actions
+      if (!messageElement && !actionsElement) {
+        setShowActions(false);
+        setShowReactionPicker(false);
+      }
+    };
+
+    // Use both touchstart and click for better coverage
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [isMobile, showActions, m.id]);
   
   const senderId = m.sender_id || m.senderId || m.sender?.id;
   const isMine = senderId === me;
@@ -98,16 +155,98 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
 
   const totalReactions = reactionCounts.reduce((sum, r) => sum + r.count, 0);
 
+  // Touch and long press handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    
+    // Don't start long press if actions are already showing
+    if (showActions) return;
+    
+    // Store initial touch position
+    const touch = e.touches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    
+    // Don't prevent default to allow scrolling
+    longPressTimer.current = setTimeout(() => {
+      setShowActions(true);
+      // Add haptic feedback if supported
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
+      }
+    }, longPressThreshold);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    
+    const hadTimer = longPressTimer.current !== null;
+    
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    
+    touchStartPos.current = null;
+    
+    // If we had a timer running but actions aren't showing, it was a tap
+    // Only prevent default if we successfully triggered long press
+    if (hadTimer && !showActions) {
+      // This was a cancelled long press, allow normal behavior
+      return;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile || !longPressTimer.current || !touchStartPos.current) return;
+    
+    // Cancel long press if user moves finger too much
+    const touch = e.touches[0];
+    const moveThreshold = 10; // pixels
+    
+    const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
+    
+    if (deltaX > moveThreshold || deltaY > moveThreshold) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      touchStartPos.current = null;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"} group`}
       data-message-id={m.id}
-      onMouseEnter={() => setShowActions(true)}
+      // Desktop interactions (hover)
+      onMouseEnter={() => !isMobile && setShowActions(true)}
       onMouseLeave={() => {
-        setShowActions(false);
-        setShowReactionPicker(false);
+        if (!isMobile) {
+          setShowActions(false);
+          setShowReactionPicker(false);
+        }
+      }}
+      // Mobile interactions (long press)
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
+      // Handle clicks - different behavior for mobile vs desktop
+      onClick={(e) => {
+        if (isMobile) {
+          // On mobile, clicks should close actions if they're open
+          if (showActions) {
+            const target = e.target as Element;
+            const actionsElement = target.closest('[data-message-actions]');
+            
+            // Close actions if clicking outside of action buttons
+            if (!actionsElement) {
+              setShowActions(false);
+              setShowReactionPicker(false);
+            }
+          }
+        }
+        // Allow normal behavior for non-mobile or for specific elements
       }}
     >
       {/* Avatar for others' messages (only in group chats) */}
@@ -149,7 +288,8 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                     ? "bg-emerald-400/40 border-l-4 border-emerald-700" 
                     : "bg-gray-100 dark:bg-[#1f2c33] border-l-4 border-emerald-600"
                 } cursor-pointer hover:opacity-80 transition-opacity`}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent message click handler
                   // TODO: Scroll to original message
                   const originalMessage = document.querySelector(`[data-message-id="${m.reply_to?.id}"]`);
                   if (originalMessage) {
@@ -232,7 +372,10 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                     key={emoji}
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => handleReaction(emoji)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent message click handler
+                      handleReaction(emoji);
+                    }}
                     className={`flex items-center gap-0.5 flex-shrink-0 ${hasReacted ? "font-semibold" : ""}`}
                   >
                     <span className="text-sm">{emoji}</span>

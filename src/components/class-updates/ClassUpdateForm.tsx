@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,19 +106,33 @@ export function ClassUpdateForm({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize form data
+  // Track initialization to prevent loops
+  const initializedRef = useRef<string | null>(null);
+  
+  // Create a stable key from initial values (memoized to prevent unnecessary recalculations)
+  const initialKey = useMemo(
+    () => `${initialClassId || ''}-${initialTitle}-${initialContent}-${initialUpdateType}`,
+    [initialClassId, initialTitle, initialContent, initialUpdateType]
+  );
+  
+  // Initialize form data only when initial values change (not on every render)
   useEffect(() => {
-    onFormDataChange({
-      classId: initialClassId || '',
-      title: initialTitle,
-      content: initialContent,
-      updateType: initialUpdateType,
-      existingAttachments: initialAttachments,
-      uploadedAttachments: [],
-    });
-    setFiles([]);
-    onErrorsChange({});
-  }, [initialClassId, initialTitle, initialContent, initialUpdateType, initialAttachments]);
+    // Only initialize if the initial values key has changed
+    if (initializedRef.current !== initialKey) {
+      initializedRef.current = initialKey;
+      onFormDataChange({
+        classId: initialClassId || '',
+        title: initialTitle,
+        content: initialContent,
+        updateType: initialUpdateType,
+        existingAttachments: initialAttachments,
+        uploadedAttachments: [],
+      });
+      setFiles([]);
+      onErrorsChange({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialKey]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);

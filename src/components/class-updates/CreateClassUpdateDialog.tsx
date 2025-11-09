@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,9 +39,26 @@ export function CreateClassUpdateDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleFormDataChange = (data: Partial<ClassUpdateFormData>) => {
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setFormData({
+        classId: '',
+        title: '',
+        content: '',
+        updateType: 'announcement',
+        existingAttachments: [],
+        uploadedAttachments: [],
+      });
+      setErrors({});
+      setIsUploading(false);
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
+  const handleFormDataChange = useCallback((data: Partial<ClassUpdateFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
-  };
+  }, []);
 
   const handleSubmit = async () => {
     // Validation
