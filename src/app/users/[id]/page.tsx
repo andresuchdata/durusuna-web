@@ -81,27 +81,19 @@ export default function UserDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/40 to-blue-50">
         <div className="container mx-auto max-w-4xl space-y-6 p-6">
-          <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <Button variant="ghost" onClick={() => router.push("/users")} className="mb-2">
+              Back to list
+            </Button>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">User Details</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 View and manage user information
               </p>
             </div>
-            <div className="flex gap-2">
-              {canEdit && (
-                <Button onClick={() => router.push(`/users/${id}/edit`)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              )}
-              <Button variant="ghost" onClick={() => router.push("/users")}>
-                Back to list
-              </Button>
-            </div>
           </div>
 
-          <UserDetailCard user={user} canEdit={canEdit} onEdit={() => router.push(`/users/${id}/edit`)} />
+          <UserDetailCard user={user} />
         </div>
       </div>
     </AppLayout>

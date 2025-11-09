@@ -168,7 +168,7 @@ export function UserTable({
         <Table>
           <TableHeader>
             <TableRow className="border-b bg-muted/30">
-              <TableHead className={`font-semibold text-foreground sticky left-0 z-10 bg-muted/30 min-w-[200px] ${hasHorizontalScroll ? 'border-r' : ''}`}>
+              <TableHead className={`font-semibold text-foreground sticky left-0 z-10 bg-white min-w-[200px] ${hasHorizontalScroll ? 'border-r' : ''}`}>
                 Name
               </TableHead>
               <TableHead className="font-semibold text-foreground min-w-[120px]">ID</TableHead>
@@ -211,7 +211,7 @@ export function UserTable({
             {!isLoading &&
               users?.map((user) => (
                 <TableRow key={user.id} className="hover:bg-muted/50 transition-colors border-b">
-                  <TableCell className={`py-4 sticky left-0 z-10 bg-card min-w-[200px] whitespace-nowrap ${hasHorizontalScroll ? 'border-r' : ''}`}>
+                  <TableCell className={`py-4 sticky left-0 z-10 bg-white min-w-[200px] whitespace-nowrap ${hasHorizontalScroll ? 'border-r' : ''}`}>
                     <Link
                       href={`/users/${user.id}`}
                       className="flex items-center gap-3 group"

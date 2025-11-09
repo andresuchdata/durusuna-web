@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent } from "react";
 import { Plus, Upload, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -74,7 +74,7 @@ export function UserToolbar({
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
+          <div className="relative flex-1 bg-white">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -101,7 +101,7 @@ export function UserToolbar({
 
       <div className="flex flex-wrap items-center gap-3">
         <Select value={userType} onValueChange={(value) => onUserTypeChange(value as typeof userType)}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-[150px] bg-white">
             <SelectValue placeholder="User Type" />
           </SelectTrigger>
           <SelectContent>
@@ -120,7 +120,7 @@ export function UserToolbar({
             else onIsActiveChange(value === "active");
           }}
         >
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[130px] bg-white">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -140,7 +140,7 @@ export function UserToolbar({
             <Button
               variant="outline"
               className={cn(
-                "w-[280px] justify-start text-left font-normal",
+                "w-[280px] justify-start text-left font-normal bg-white",
                 !dobFrom && !dobTo && "text-muted-foreground"
               )}
             >

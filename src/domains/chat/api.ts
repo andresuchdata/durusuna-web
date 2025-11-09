@@ -111,3 +111,9 @@ export async function forwardMessage(messageId: string, targetConversationId: st
 export async function deleteMessage(messageId: string): Promise<void> {
   await http().delete(`/messages/${messageId}`);
 }
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  console.log('[API] Deleting conversation:', conversationId);
+  await http().delete(`/conversations/${conversationId}`);
+  console.log('[API] Conversation deleted:', conversationId);
+}

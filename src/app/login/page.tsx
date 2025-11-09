@@ -17,8 +17,13 @@ export default function LoginPage() {
     try {
       await mutateAsync({ email, password });
       window.location.href = "/conversations";
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Login failed");
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        setError(axiosError.response?.data?.message || "Login failed");
+      } else {
+        setError("Login failed");
+      }
     }
   }
 
@@ -59,6 +64,18 @@ export default function LoginPage() {
             {isPending ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+        
+        <div className="text-center pt-4">
+          <p className="text-sm text-muted-foreground">
+            Don&apos;t have a school account?{" "}
+            <a
+              href="/register"
+              className="font-medium text-primary hover:underline"
+            >
+              Create one here
+            </a>
+          </p>
+        </div>
       </div>
     </main>
   );

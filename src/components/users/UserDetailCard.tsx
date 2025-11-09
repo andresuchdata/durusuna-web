@@ -2,15 +2,11 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { User } from "@/domains/users/types";
-import { Pencil } from "lucide-react";
 
 type UserDetailCardProps = {
   user: User;
-  onEdit?: () => void;
-  canEdit: boolean;
 };
 
 function getInitials(user: User) {
@@ -21,10 +17,10 @@ function formatUserType(userType: User["user_type"]) {
   return userType.charAt(0).toUpperCase() + userType.slice(1);
 }
 
-export function UserDetailCard({ user, onEdit, canEdit }: UserDetailCardProps) {
+export function UserDetailCard({ user }: UserDetailCardProps) {
   return (
     <Card className="border shadow-sm">
-      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <CardHeader>
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={user.avatar_url ?? undefined} />
@@ -41,12 +37,6 @@ export function UserDetailCard({ user, onEdit, canEdit }: UserDetailCardProps) {
             </div>
           </div>
         </div>
-        {canEdit && onEdit && (
-          <Button onClick={onEdit} variant="outline" className="shrink-0">
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-6">
         <section>

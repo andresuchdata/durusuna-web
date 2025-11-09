@@ -244,13 +244,13 @@ export default function ChatsPage() {
             ) : data && data.length > 0 ? (
               <div>
               {data.map((c) => (
-                <div key={c.id} onClick={() => setSelectedId(c.id)} className="cursor-pointer">
-                  <ConversationItem 
-                    c={c} 
-                    isSelected={selectedId === c.id}
-                    isTyping={typingInConversations.has(c.id)}
-                  />
-                </div>
+                <ConversationItem 
+                  key={c.id}
+                  c={c} 
+                  isSelected={selectedId === c.id}
+                  isTyping={typingInConversations.has(c.id)}
+                  onSelect={() => setSelectedId(c.id)}
+                />
               ))}
               </div>
             ) : (

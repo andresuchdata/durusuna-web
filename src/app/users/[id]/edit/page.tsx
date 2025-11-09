@@ -97,17 +97,17 @@ export default function UserEditPage() {
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/40 to-blue-50">
         <div className="container mx-auto max-w-4xl space-y-6 p-6">
-          <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <Button variant="ghost" onClick={() => router.push(`/users/${id}`)} className="mb-2">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Edit User</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Update user information and settings
               </p>
             </div>
-            <Button variant="ghost" onClick={() => router.push(`/users/${id}`)}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
           </div>
 
           <Card className="p-6 md:p-8">
