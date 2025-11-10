@@ -22,6 +22,7 @@ type BackendMessage = {
   content?: string | null;
   text?: string | null;
   attachments?: Message["attachments"];
+  metadata?: Record<string, unknown> | string | null;
   created_at?: string;
   createdAt?: string;
   read_status?: "read" | "delivered" | "sent" | null;
@@ -67,6 +68,26 @@ function transformMessage(backendMessage: BackendMessage): Message {
   }
 
   const messageContent = backendMessage.content ?? backendMessage.text ?? undefined;
+  
+  // Extract attachments from metadata if they exist
+  let attachments = backendMessage.attachments ?? [];
+  if (backendMessage.metadata && typeof backendMessage.metadata === 'object') {
+    const metadataAttachments = (backendMessage.metadata as Record<string, unknown>).attachments;
+    if (Array.isArray(metadataAttachments)) {
+      attachments = metadataAttachments;
+    }
+  }
+  // Also try parsing metadata if it's a string
+  else if (typeof backendMessage.metadata === 'string') {
+    try {
+      const parsedMetadata = JSON.parse(backendMessage.metadata) as Record<string, unknown>;
+      if (parsedMetadata.attachments && Array.isArray(parsedMetadata.attachments)) {
+        attachments = parsedMetadata.attachments;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }
 
   return {
     id: backendMessage.id,
@@ -78,7 +99,7 @@ function transformMessage(backendMessage: BackendMessage): Message {
     sender: backendMessage.sender,
     text: messageContent,
     content: messageContent,
-    attachments: backendMessage.attachments ?? [],
+    attachments: attachments,
     createdAt: backendMessage.created_at ?? backendMessage.createdAt,
     created_at: backendMessage.created_at ?? undefined,
     status: backendMessage.read_status === 'read' ? 'read' : 

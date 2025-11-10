@@ -12,7 +12,8 @@ import {
   deleteMessage,
   forwardMessage,
   updateConversation,
-  uploadFile
+  uploadFile,
+  sendMessageWithFiles
 } from "./api";
 import type { Conversation, Message } from "./types";
 import { useChatRealtime } from "./realtime";
@@ -397,5 +398,55 @@ export function useUploadFile() {
   return useMutation({
     mutationFn: ({ file, folder }: { file: File; folder?: string }) =>
       uploadFile(file, folder),
+  });
+}
+
+export function useSendMessageWithFiles(conversationId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ 
+      text, 
+      files, 
+      replyTo 
+    }: { 
+      text: string; 
+      files: File[]; 
+      replyTo?: string; 
+    }) => sendMessageWithFiles(conversationId, text, files, { replyTo }),
+    
+    onSuccess: (newMessage) => {
+      // Add the new message to the cache
+      queryClient.setQueryData(
+        ["chat", "conversation", "messages", conversationId],
+        (old: any) => {
+          if (!old) return { items: [newMessage], nextCursor: null };
+          return { ...old, items: [newMessage, ...old.items] };
+        }
+      );
+
+      // Update conversations list to show this as the latest message
+      queryClient.setQueryData(
+        ["chat", "conversations"],
+        (old: Conversation[]) => {
+          if (!old) return old;
+          return old.map(conv => 
+            conv.id === conversationId 
+              ? { 
+                  ...conv, 
+                  last_message: {
+                    id: newMessage.id,
+                    text: newMessage.text || newMessage.content || 'Media',
+                    content: newMessage.content || newMessage.text,
+                    sender_id: newMessage.sender_id || newMessage.senderId || '',
+                    created_at: newMessage.created_at || newMessage.createdAt || new Date().toISOString(),
+                  },
+                  updated_at: newMessage.created_at || newMessage.createdAt
+                }
+              : conv
+          );
+        }
+      );
+    },
   });
 }

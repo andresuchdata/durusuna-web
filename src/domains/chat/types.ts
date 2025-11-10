@@ -1,3 +1,5 @@
+import type { AttachmentData } from "@/shared/types/attachment";
+
 export type Conversation = {
   id: string;
   type: "direct" | "group";
@@ -45,7 +47,7 @@ export type Message = {
   };
   text?: string;
   content?: string;
-  attachments?: Array<{ id: string; url: string; type: string }>;
+  attachments?: AttachmentData[];
   created_at?: string;
   createdAt?: string;
   status?: "sent" | "delivered" | "read";

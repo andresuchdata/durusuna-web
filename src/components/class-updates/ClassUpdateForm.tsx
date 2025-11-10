@@ -15,6 +15,13 @@ import {
 import { X, Upload, FileText, Image as ImageIcon, Video, File, Loader2 } from "lucide-react";
 import { uploadAttachments } from "@/domains/class-updates/api";
 import { Badge } from "@/components/ui/badge";
+import type { AttachmentData } from "@/shared/types/attachment";
+import { 
+  getAttachmentDisplayName, 
+  getAttachmentMimeType, 
+  getAttachmentSizeFormatted,
+  formatFileSize
+} from "@/shared/types/attachment";
 
 const UPDATE_TYPES = [
   { value: 'announcement', label: 'Announcement', color: 'bg-blue-100 text-blue-700' },
@@ -26,31 +33,10 @@ const UPDATE_TYPES = [
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-type AttachmentData = {
-  id: string;
-  originalName?: string;
-  name?: string;
-  fileName?: string;
-  mimeType?: string;
-  type?: string;
-  size: number;
-  url: string;
-  key?: string;
-  sizeFormatted?: string;
-};
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-}
-
-function getFileIcon(type: string) {
-  if (type.startsWith('image/')) return <ImageIcon className="h-4 w-4" />;
-  if (type.startsWith('video/')) return <Video className="h-4 w-4" />;
-  if (type.includes('pdf') || type.includes('document')) return <FileText className="h-4 w-4" />;
+function getFileIcon(mimeType: string) {
+  if (mimeType.startsWith('image/')) return <ImageIcon className="h-4 w-4" />;
+  if (mimeType.startsWith('video/')) return <Video className="h-4 w-4" />;
+  if (mimeType.includes('pdf') || mimeType.includes('document')) return <FileText className="h-4 w-4" />;
   return <File className="h-4 w-4" />;
 }
 
@@ -323,12 +309,12 @@ export function ClassUpdateForm({
           <div className="space-y-2">
             {formData.existingAttachments.map((attachment, index) => (
               <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                {getFileIcon(attachment.type || attachment.mimeType || '')}
+                {getFileIcon(getAttachmentMimeType(attachment))}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {attachment.name || attachment.originalName || attachment.fileName || 'Unknown file'}
+                    {getAttachmentDisplayName(attachment)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                  <p className="text-xs text-muted-foreground">{getAttachmentSizeFormatted(attachment)}</p>
                 </div>
                 <Button
                   type="button"
@@ -433,13 +419,13 @@ export function ClassUpdateForm({
               <div className="space-y-2">
                 {formData.uploadedAttachments.map((attachment, index) => (
                   <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
-                    {getFileIcon(attachment.mimeType || attachment.type || '')}
+                    {getFileIcon(getAttachmentMimeType(attachment))}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {attachment.originalName || attachment.name || attachment.fileName || 'Unknown file'}
+                        {getAttachmentDisplayName(attachment)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {attachment.sizeFormatted || formatFileSize(attachment.size)}
+                        {getAttachmentSizeFormatted(attachment)}
                       </p>
                     </div>
                     <Badge variant="secondary" className="text-xs">Uploaded</Badge>

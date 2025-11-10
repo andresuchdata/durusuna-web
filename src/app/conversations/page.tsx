@@ -8,7 +8,7 @@ import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -17,6 +17,7 @@ import { Message, Conversation } from "@/domains/chat/types";
 import { NewConversationDialog } from "@/components/conversations/NewConversationDialog";
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
 import { EmojiPickerComponent } from "@/domains/chat/components/EmojiPicker";
+import { FileUploadModal } from "@/domains/chat/components/FileUploadModal";
 import { AnimatePresence, motion } from "framer-motion";
 
 function ChatsPageContent() {
@@ -398,7 +399,11 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [isTyping, setIsTyping] = useState(false);
   const [theirTyping, setTheirTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showFileUploadOptions, setShowFileUploadOptions] = useState(false);
+  const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
+  const { mutateAsync: sendWithFiles, isPending: isUploadingFiles } = useSendMessageWithFiles(conversationId);
   const toggleReactionMutation = useToggleReaction(conversationId);
   const reactToMessage = toggleReactionMutation?.mutate;
   const reactToMessageRef = useRef(reactToMessage);
@@ -518,8 +523,56 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     inputRef.current?.focus();
   }
 
+  const handleFileUpload = async (files: File[]) => {
+    await sendWithFiles({
+      text: text.trim(),
+      files,
+      replyTo: replyTo?.id,
+    });
+    setText("");
+    setReplyTo(null);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      handleFileUpload(files);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full w-full min-h-0">
+    <div 
+      className={`flex flex-col h-full w-full min-h-0 ${dragActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+    >
+      {/* Drag and Drop Overlay */}
+      {dragActive && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/20 border-2 border-dashed border-blue-500">
+          <div className="text-center">
+            <div className="text-2xl mb-2">📁</div>
+            <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">Drop files here to send</p>
+            <p className="text-sm text-blue-500">Release to upload files to this conversation</p>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a] min-h-0 pb-[80px]">
         {isLoading ? (
@@ -630,15 +683,17 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 
         <form onSubmit={onSend} className="p-3 md:p-4 flex gap-2 relative">
           <div className="flex-1 relative">
+            {/* File Upload Button - Left Side */}
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              onClick={() => setShowFileUploadOptions(!showFileUploadOptions)}
               className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 z-10"
             >
-              <Smile className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </Button>
+            
             <input
               ref={inputRef}
               value={text}
@@ -661,13 +716,74 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                 }
               }}
               placeholder="Type a message"
-              className="h-9 w-full rounded-md border border-input bg-transparent pl-10 pr-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-9 w-full rounded-md border border-input bg-transparent pl-10 pr-10 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               disabled={isPending}
             />
+
+            {/* Emoji Picker Button - Right Side */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 z-10"
+            >
+              <Smile className="h-4 w-4" />
+            </Button>
             
+            {/* File Upload Options */}
+            {showFileUploadOptions && (
+              <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-[#2a3942] border border-border rounded-lg shadow-xl py-2 min-w-[200px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFileUploadOptions(false);
+                    setShowFileUploadModal(true);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
+                >
+                  <ImageIcon className="h-5 w-5 text-blue-500" />
+                  <span>Add Image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFileUploadOptions(false);
+                    setShowFileUploadModal(true);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
+                >
+                  <Video className="h-5 w-5 text-red-500" />
+                  <span>Add Video</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFileUploadOptions(false);
+                    setShowFileUploadModal(true);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
+                >
+                  <Music className="h-5 w-5 text-green-500" />
+                  <span>Add Audio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFileUploadOptions(false);
+                    setShowFileUploadModal(true);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
+                >
+                  <File className="h-5 w-5 text-purple-500" />
+                  <span>Add Document</span>
+                </button>
+              </div>
+            )}
+
             {/* Emoji Picker with proper z-index */}
             {showEmojiPicker && (
-              <div ref={emojiPickerRef} className="absolute bottom-full mb-2 left-0 z-50">
+              <div ref={emojiPickerRef} className="absolute bottom-full mb-2 right-0 z-50">
                 <EmojiPickerComponent
                   onSelectEmoji={(emoji) => {
                     setText(prev => prev + emoji);
@@ -680,17 +796,25 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
               </div>
             )}
           </div>
-          <Button type="submit" disabled={isPending || !text.trim()} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
-            Send
+          <Button type="submit" disabled={(isPending && !isUploadingFiles) || (!text.trim() && !isUploadingFiles)} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
+            {isUploadingFiles ? 'Uploading...' : isPending ? 'Sending...' : 'Send'}
           </Button>
         </form>
       </div>
+
+      {/* File Upload Modal */}
+      <FileUploadModal
+        open={showFileUploadModal}
+        onClose={() => setShowFileUploadModal(false)}
+        onUpload={handleFileUpload}
+        conversationId={conversationId}
+      />
     </div>
   );
 }
 
 // Import required hooks
-import { useConversationMessages, useSendMessage, useMarkConversationAsRead, useToggleReaction } from "@/domains/chat/hooks";
+import { useConversationMessages, useSendMessage, useMarkConversationAsRead, useToggleReaction, useSendMessageWithFiles } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";
 import { useChatRealtime } from "@/domains/chat/realtime";
