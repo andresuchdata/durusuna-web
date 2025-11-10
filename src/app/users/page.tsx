@@ -182,7 +182,7 @@ export default function UsersPage() {
             canDelete={canDelete}
             onEdit={handleEditClick}
             onDelete={canDelete ? handleDelete : undefined}
-            defaultSort={sortConfig}
+            defaultSort={sortConfig ?? undefined}
             onSortChange={handleSortChange}
             enableServerSort={false}
           />
