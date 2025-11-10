@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useConversations } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
@@ -23,6 +23,7 @@ function ChatsPageContent() {
   const { data, isLoading, error } = useConversations();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const router = useRouter();
   
   // Initialize selectedId from URL parameter or null
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -279,30 +280,38 @@ function ChatsPageContent() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 
-                <Avatar className="h-9 w-9 md:h-10 md:w-10 shrink-0">
-                  <AvatarImage src={
-                    (selectedConversation.type === 'direct' && selectedConversation.other_user
-                      ? selectedConversation.other_user.avatar_url
-                      : selectedConversation.avatar_url) || undefined
-                  } />
-                  <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                    {(() => {
-                      if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
-                        return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
-                      }
-                      return (selectedConversation.name || 'C').charAt(0).toUpperCase();
-                    })()}
-                  </AvatarFallback>
-                </Avatar>
+                <button 
+                  onClick={() => router.push(`/conversations/${selectedId}/profile`)}
+                  className="shrink-0 hover:opacity-80 transition-opacity"
+                >
+                  <Avatar className="h-9 w-9 md:h-10 md:w-10 shrink-0">
+                    <AvatarImage src={
+                      (selectedConversation.type === 'direct' && selectedConversation.other_user
+                        ? selectedConversation.other_user.avatar_url
+                        : selectedConversation.avatar_url) || undefined
+                    } />
+                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                      {(() => {
+                        if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
+                          return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
+                        }
+                        return (selectedConversation.name || 'C').charAt(0).toUpperCase();
+                      })()}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
                 
-                <div className="flex-1 min-w-0 max-w-full overflow-hidden pr-2">
+                <button 
+                  onClick={() => router.push(`/conversations/${selectedId}/profile`)}
+                  className="flex-1 min-w-0 max-w-full overflow-hidden pr-2 text-left hover:opacity-80 transition-opacity"
+                >
                   <h2 className="font-semibold text-sm md:text-base truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">
                     {selectedConversation.type === 'direct' && selectedConversation.other_user
                       ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
                       : selectedConversation.name || 'Conversation'}
                   </h2>
                   <p className="text-xs text-muted-foreground truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">online</p>
-                </div>
+                </button>
                 
                 <div className="flex items-center gap-1 md:gap-2 shrink-0">
                   {/* Hide video/phone on mobile */}

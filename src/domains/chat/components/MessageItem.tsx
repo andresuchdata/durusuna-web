@@ -291,11 +291,11 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         )}
 
         {/* Message bubble */}
-        <div className="relative w-full max-w-full min-w-0">
+        <div className="relative w-fit max-w-[70%] min-w-[80px]">
           {/* Main message */}
           <div
             className={`
-              message-bubble rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden 
+              message-bubble rounded-2xl shadow-sm w-fit min-w-[80px] max-w-[70%] overflow-hidden 
               transition-all duration-200
               ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}
               ${

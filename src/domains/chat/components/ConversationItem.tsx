@@ -4,6 +4,7 @@ import type { Conversation } from "../types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,7 @@ export function ConversationItem({
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // For direct chats, use other_user's name
   let title = "Conversation";
@@ -89,6 +91,12 @@ export function ConversationItem({
     onSelect?.();
   };
 
+  const handleAvatarClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/conversations/${c.id}/profile`);
+  };
+
   const handleDeleteClick = () => {
     setContextMenuVisible(false);
     setShowDeleteDialog(true);
@@ -116,10 +124,15 @@ export function ConversationItem({
               onClick={handleClick}
               onContextMenu={handleContextMenu}
             >
-              <Avatar className="h-12 w-12 flex-shrink-0">
-                <AvatarImage src={avatarUrl || undefined} />
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 font-semibold">{initials}</AvatarFallback>
-              </Avatar>
+              <button 
+                onClick={handleAvatarClick}
+                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+              >
+                <Avatar className="h-12 w-12 flex-shrink-0">
+                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 font-semibold">{initials}</AvatarFallback>
+                </Avatar>
+              </button>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold truncate text-foreground text-base">{title}</h3>

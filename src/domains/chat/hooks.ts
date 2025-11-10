@@ -10,7 +10,9 @@ import {
   markConversationAsRead,
   toggleReaction,
   deleteMessage,
-  forwardMessage
+  forwardMessage,
+  updateConversation,
+  uploadFile
 } from "./api";
 import type { Conversation, Message } from "./types";
 import { useChatRealtime } from "./realtime";
@@ -369,5 +371,31 @@ export function useForwardMessage() {
       // Invalidate conversations to show the new message
       qc.invalidateQueries({ queryKey: ["chat", "conversations"] });
     },
+  });
+}
+
+export function useUpdateConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, data }: { 
+      conversationId: string; 
+      data: { name?: string; description?: string; avatar_url?: string }
+    }) => updateConversation(conversationId, data),
+    onSuccess: (updatedConversation) => {
+      // Update the conversation in the cache
+      qc.setQueryData<Conversation[]>(["chat", "conversations"], (old) => {
+        if (!old) return old;
+        return old.map((conv) =>
+          conv.id === updatedConversation.id ? { ...conv, ...updatedConversation } : conv
+        );
+      });
+    },
+  });
+}
+
+export function useUploadFile() {
+  return useMutation({
+    mutationFn: ({ file, folder }: { file: File; folder?: string }) =>
+      uploadFile(file, folder),
   });
 }

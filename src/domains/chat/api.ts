@@ -117,3 +117,38 @@ export async function deleteConversation(conversationId: string): Promise<void> 
   await http().delete(`/conversations/${conversationId}`);
   console.log('[API] Conversation deleted:', conversationId);
 }
+
+export async function updateConversation(
+  conversationId: string, 
+  data: {
+    name?: string;
+    description?: string;
+    avatar_url?: string;
+  }
+): Promise<Conversation> {
+  console.log('[API] Updating conversation:', conversationId, data);
+  const { data: response } = await http().put(`/conversations/${conversationId}`, data);
+  console.log('[API] Conversation updated:', conversationId);
+  return response.conversation;
+}
+
+export async function uploadFile(
+  file: File,
+  folder: string = 'avatars'
+): Promise<{ url: string; key: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("folder", folder);
+  formData.append("processImage", "true");
+
+  const { data } = await http().post("/uploads/file", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return {
+    url: data.file?.url,
+    key: data.file?.key,
+  };
+}
