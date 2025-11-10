@@ -521,7 +521,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   return (
     <div className="flex flex-col h-full w-full min-h-0">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a] min-h-0">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a] min-h-0 pb-[80px]">
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading messages…</div>
         ) : error ? (
@@ -546,7 +546,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
             
             {/* Typing indicator */}
             <AnimatePresence>
-              {theirTyping && <TypingIndicator />}
+              {theirTyping && <div className="mb-8"><TypingIndicator /></div>}
             </AnimatePresence>
             
             {/* Invisible element to scroll to */}
