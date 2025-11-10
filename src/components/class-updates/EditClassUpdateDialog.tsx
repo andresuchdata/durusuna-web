@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { updateClassUpdate } from "@/domains/class-updates/api";
 import type { ClassUpdate } from "@/domains/class-updates/types";
 import { ClassUpdateForm, type ClassUpdateFormData } from "./ClassUpdateForm";
+import type { AttachmentData } from "@/shared/types/attachment";
 
 interface EditClassUpdateDialogProps {
   open: boolean;
@@ -21,19 +22,6 @@ interface EditClassUpdateDialogProps {
   onSuccess?: () => void;
   update: ClassUpdate;
 }
-
-type AttachmentData = {
-  id: string;
-  originalName?: string;
-  name?: string;
-  fileName?: string;
-  mimeType?: string;
-  type?: string;
-  size: number;
-  url: string;
-  key?: string;
-  sizeFormatted?: string;
-};
 
 export function EditClassUpdateDialog({ 
   open, 

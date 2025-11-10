@@ -152,3 +152,60 @@ export async function uploadFile(
     key: data.file?.key,
   };
 }
+
+export async function uploadChatMedia(
+  conversationId: string,
+  files: File[]
+): Promise<{
+  success: boolean;
+  files: Array<{
+    id: string;
+    url: string;
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    type: string;
+  }>;
+}> {
+  const formData = new FormData();
+  
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+
+  const { data } = await http().post(`/conversations/${conversationId}/upload-media`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return data;
+}
+
+export async function sendMessageWithFiles(
+  conversationId: string,
+  text: string,
+  files: File[],
+  options?: {
+    replyTo?: string;
+  }
+): Promise<Message> {
+  // First upload the files
+  const uploadResult = await uploadChatMedia(conversationId, files);
+  
+  // Transform uploaded files to attachments format
+  const attachments = uploadResult.files.map(file => ({
+    id: file.id,
+    url: file.url,
+    type: file.type,
+    name: file.originalName,
+    size: file.size,
+  }));
+
+  // Then send the message with attachments
+  return sendMessage(conversationId, text, {
+    replyTo: options?.replyTo,
+    attachments,
+  });
+}

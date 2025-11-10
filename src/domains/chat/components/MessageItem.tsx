@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MediaThumbnailGrid, MediaViewer } from "@/components/media/MediaViewer";
 import type { MediaItem } from "@/components/media/MediaViewer";
 import { ImagePreview, useImagePreview } from "@/components/ui/image-preview";
+import { FileAttachment } from "./FileAttachment";
 
 interface MessageItemProps {
   m: Message;
@@ -103,13 +104,25 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     ? `${m.sender.first_name[0]}${m.sender.last_name[0]}`
     : "?";
 
-  // Transform attachments to MediaItem format
-  const mediaItems: MediaItem[] = (m.attachments || []).map((att) => ({
-    id: att.id,
-    name: att.type?.split('/').pop() || 'file',
-    url: att.url,
-    type: att.type,
-  }));
+  // Separate media files from document files
+  const attachments = m.attachments || [];
+  const mediaItems: MediaItem[] = [];
+  const fileAttachments: typeof attachments = [];
+
+  attachments.forEach((att) => {
+    const type = att.mimeType || att.type || 'file';
+    if (type.startsWith('image/') || type.startsWith('video/') || type.startsWith('audio/')) {
+      mediaItems.push({
+        id: att.id,
+        name: att.originalName || att.fileName || att.type?.split('/').pop() || 'file',
+        url: att.url,
+        type: type,
+        size: att.size,
+      });
+    } else {
+      fileAttachments.push(att);
+    }
+  });
 
   const handleCopy = () => {
     navigator.clipboard.writeText(messageText);
@@ -385,6 +398,18 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
                     setMediaViewerOpen(true);
                   }}
                 />
+              </div>
+            )}
+
+            {/* File attachments */}
+            {fileAttachments.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {fileAttachments.map((attachment) => (
+                  <FileAttachment
+                    key={attachment.id}
+                    attachment={attachment}
+                  />
+                ))}
               </div>
             )}
 
