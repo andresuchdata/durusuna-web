@@ -10,6 +10,7 @@ import {
   listUsers,
   updateUser,
 } from "./api";
+import { useAccessibleUsers, useUserPermissions } from "@/domains/access";
 import type {
   BatchCreateUsersPayload,
   CreateUserPayload,
@@ -85,10 +86,37 @@ export function useBatchCreateUsers() {
 }
 
 export function useContacts(params?: GetContactsParams) {
-  return useQuery({
-    queryKey: ["users", "contacts", params],
-    queryFn: () => getContacts(params),
-    staleTime: 30_000,
-  });
+  // Convert GetContactsParams to AccessUsersParams format
+  const accessParams = {
+    page: params?.page,
+    limit: params?.limit,
+    search: params?.search,
+    userType: params?.userType as 'all' | 'teacher' | 'student' | 'parent' | undefined,
+    includeInactive: false,
+  };
+
+  const accessQuery = useAccessibleUsers(accessParams);
+
+  // Transform the response to match the old contacts format
+  return {
+    ...accessQuery,
+    data: accessQuery.data ? {
+      contacts: accessQuery.data.data.users.map(user => ({
+        id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        phone: user.phone,
+        avatar_url: user.avatar_url,
+        user_type: user.user_type as 'teacher' | 'student' | 'parent' | 'admin',
+        role: user.role as 'admin' | 'user',
+        school_id: user.school_id,
+        is_active: user.is_active,
+        last_active_at: user.last_login_at,
+      })),
+      pagination: accessQuery.data.data.pagination,
+      totalContacts: accessQuery.data.data.pagination.total,
+    } : undefined,
+  };
 }
 
