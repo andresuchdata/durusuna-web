@@ -32,6 +32,8 @@ export type UserListQuery = {
   isActive?: boolean;
   dobFrom?: string;
   dobTo?: string;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
 };
 
 export type CreateUserPayload = {

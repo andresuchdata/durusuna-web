@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { UserToolbar } from "@/components/users/UserToolbar";
-import { UserTable } from "@/components/users/UserTable";
+import { UserTableSortable } from "@/components/users/UserTableSortable";
+import type { SortConfig } from "@/components/ui/sortable-table";
 import { UserFormDialog } from "@/components/users/UserFormDialog";
 import { UserBatchDialog } from "@/components/users/UserBatchDialog";
 import { Card } from "@/components/ui/card";
@@ -36,6 +37,10 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isBatchOpen, setBatchOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({
+    key: 'name',
+    direction: 'asc'
+  });
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -101,6 +106,11 @@ export default function UsersPage() {
     router.push(`/users/${user.id}/edit`);
   };
 
+  const handleSortChange = (newSortConfig: SortConfig | null) => {
+    setSortConfig(newSortConfig);
+    setPage(1); // Reset to first page when sorting changes
+  };
+
   useEffect(() => {
     setTimeout(() => {
       setPage(1);
@@ -161,7 +171,7 @@ export default function UsersPage() {
             onBatchCreate={() => setBatchOpen(true)}
           />
 
-          <UserTable
+          <UserTableSortable
             users={usersQuery.data?.users}
             isLoading={usersQuery.isLoading}
             page={page}
@@ -172,6 +182,9 @@ export default function UsersPage() {
             canDelete={canDelete}
             onEdit={handleEditClick}
             onDelete={canDelete ? handleDelete : undefined}
+            defaultSort={sortConfig}
+            onSortChange={handleSortChange}
+            enableServerSort={false}
           />
         </div>
       </div>
