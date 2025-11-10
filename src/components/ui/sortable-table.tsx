@@ -4,6 +4,15 @@ import * as React from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
+import { 
+  getNestedValue, 
+  sortData, 
+  getDisplayValue,
+  getNextSortDirection,
+  createSortConfig,
+  type SortDirection, 
+  type SortConfig 
+} from "@/lib/tableUtils";
 import {
   Table,
   TableBody,
@@ -13,10 +22,8 @@ import {
   TableRow,
 } from "./table";
 
-// Types for sorting configuration
-export type SortDirection = "asc" | "desc" | null;
-
-export type ColumnConfig<T = any> = {
+// Component-specific types
+export type ColumnConfig<T = unknown> = {
   key: string;
   header: string | React.ReactNode;
   sortable?: boolean;
@@ -29,12 +36,7 @@ export type ColumnConfig<T = any> = {
   sticky?: boolean; // For sticky columns
 };
 
-export type SortConfig = {
-  key: string;
-  direction: SortDirection;
-};
-
-type SortableTableProps<T = any> = {
+type SortableTableProps<T = unknown> = {
   data: T[];
   columns: ColumnConfig<T>[];
   loading?: boolean;
@@ -53,48 +55,8 @@ type SortableTableProps<T = any> = {
   tableKey?: string; // For React key optimization
 };
 
-// Utility function to get nested property value
-function getNestedValue(obj: any, path: string): any {
-  return path.split('.').reduce((current, key) => current?.[key], obj);
-}
 
-// Client-side sorting function
-function sortData<T>(data: T[], sortConfig: SortConfig | null, columns: ColumnConfig<T>[]): T[] {
-  if (!sortConfig || !sortConfig.direction) {
-    return data;
-  }
-
-  const column = columns.find(col => col.key === sortConfig.key);
-  const sortKey = column?.sortKey || sortConfig.key;
-
-  return [...data].sort((a, b) => {
-    const aValue = getNestedValue(a, sortKey);
-    const bValue = getNestedValue(b, sortKey);
-    
-    // Handle null/undefined values
-    if (aValue == null && bValue == null) return 0;
-    if (aValue == null) return 1;
-    if (bValue == null) return -1;
-    
-    // Handle different data types
-    let comparison = 0;
-    
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
-    } else if (typeof aValue === 'number' && typeof bValue === 'number') {
-      comparison = aValue - bValue;
-    } else if (aValue instanceof Date && bValue instanceof Date) {
-      comparison = aValue.getTime() - bValue.getTime();
-    } else {
-      // Fallback to string comparison
-      comparison = String(aValue).localeCompare(String(bValue));
-    }
-    
-    return sortConfig.direction === 'desc' ? -comparison : comparison;
-  });
-}
-
-export function SortableTable<T = any>({
+export function SortableTable<T = unknown>({
   data,
   columns,
   loading = false,
@@ -144,12 +106,10 @@ export function SortableTable<T = any>({
     let newDirection: SortDirection = 'asc';
     
     if (sortConfig?.key === columnKey) {
-      // Cycling: asc -> desc -> null -> asc
-      newDirection = sortConfig.direction === 'asc' ? 'desc' : 
-                    sortConfig.direction === 'desc' ? null : 'asc';
+      newDirection = getNextSortDirection(sortConfig.direction);
     }
 
-    const newSortConfig = newDirection ? { key: columnKey, direction: newDirection } : null;
+    const newSortConfig = createSortConfig(columnKey, newDirection);
     setSortConfig(newSortConfig);
     onSortChange?.(newSortConfig);
   }, [sortConfig, columns, onSortChange]);
@@ -291,7 +251,7 @@ export function SortableTable<T = any>({
                       >
                         {column.render 
                           ? column.render(item, index)
-                          : String(getNestedValue(item, column.key) || '—')
+                          : getDisplayValue(getNestedValue(item, column.key))
                         }
                       </TableCell>
                     ))}
@@ -311,5 +271,3 @@ export function SortableTable<T = any>({
   );
 }
 
-// Export types for convenience
-export type { ColumnConfig, SortConfig, SortDirection };

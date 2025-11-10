@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { UserToolbar } from "@/components/users/UserToolbar";
 import { UserTableSortable } from "@/components/users/UserTableSortable";
-import type { SortConfig } from "@/components/ui/sortable-table";
+import type { SortConfig } from "@/lib/tableUtils";
 import { UserFormDialog } from "@/components/users/UserFormDialog";
 import { UserBatchDialog } from "@/components/users/UserBatchDialog";
 import { Card } from "@/components/ui/card";

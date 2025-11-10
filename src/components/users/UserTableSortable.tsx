@@ -23,7 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { SortableTable, type ColumnConfig, type SortConfig } from "@/components/ui/sortable-table";
+import { SortableTable, type ColumnConfig } from "@/components/ui/sortable-table";
+import type { SortConfig } from "@/lib/tableUtils";
 import type { User } from "@/domains/users/types";
 
 type UserTableSortableProps = {
