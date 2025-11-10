@@ -9,6 +9,7 @@ import { ReactionPicker } from "./ReactionPicker";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MediaThumbnailGrid, MediaViewer } from "@/components/media/MediaViewer";
 import type { MediaItem } from "@/components/media/MediaViewer";
+import { ImagePreview, useImagePreview } from "@/components/ui/image-preview";
 
 interface MessageItemProps {
   m: Message;
@@ -29,6 +30,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   const [isMobile, setIsMobile] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [isSelected, setIsSelected] = useState(false);
+  const { isOpen, imageSrc, imageAlt, imageTitle, openPreview, closePreview } = useImagePreview();
   
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressThreshold = 500; // 500ms for long press
@@ -273,7 +275,13 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
       {!isMine && conversationType === "group" && (
         <Avatar 
           className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity mt-1" 
-          onClick={() => onAvatarClick?.(senderId || "")}
+          onClick={() => {
+            if (m.sender?.avatar_url) {
+              openPreview(m.sender.avatar_url, `${senderName} Avatar`, senderName);
+            } else {
+              onAvatarClick?.(senderId || "");
+            }
+          }}
         >
           <AvatarImage src={m.sender?.avatar_url} alt={senderName} />
           <AvatarFallback className="bg-emerald-600 text-white text-xs">
@@ -291,11 +299,17 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         )}
 
         {/* Message bubble */}
-        <div className="relative w-fit max-w-[70%] min-w-[80px]">
+        <div className={`relative w-fit min-w-[80px] ${
+          messageText && messageText.length > 50 
+            ? 'max-w-[85%]' 
+            : messageText && messageText.length > 20
+              ? 'max-w-[80%]' 
+              : 'max-w-[70%]'
+        }`}>
           {/* Main message */}
           <div
             className={`
-              message-bubble rounded-2xl shadow-sm w-fit min-w-[80px] max-w-[70%] overflow-hidden 
+              message-bubble rounded-2xl shadow-sm w-full overflow-hidden 
               transition-all duration-200
               ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}
               ${
@@ -401,7 +415,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className={`absolute -bottom-3 ${isMine ? "right-2" : "left-2"} bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 shadow-md`}
+              className={`absolute -bottom-1 ${isMine ? "right-2" : "left-2"} bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 shadow-md z-10`}
               style={{ 
                 maxWidth: 'calc(100% - 0.5rem)'
               }}
@@ -482,6 +496,15 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
           onOpenChange={setMediaViewerOpen}
         />
       )}
+
+      {/* Image Preview Modal */}
+      <ImagePreview
+        src={imageSrc}
+        alt={imageAlt}
+        title={imageTitle}
+        isOpen={isOpen}
+        onClose={closePreview}
+      />
     </motion.div>
   );
 }

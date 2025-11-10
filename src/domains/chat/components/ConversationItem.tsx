@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ImagePreview, useImagePreview } from "@/components/ui/image-preview";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ export function ConversationItem({
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { isOpen, imageSrc, imageAlt, imageTitle, openPreview, closePreview } = useImagePreview();
 
   // For direct chats, use other_user's name
   let title = "Conversation";
@@ -94,7 +96,12 @@ export function ConversationItem({
   const handleAvatarClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    router.push(`/conversations/${c.id}/profile`);
+    
+    if (avatarUrl) {
+      openPreview(avatarUrl, `${title} Avatar`, title);
+    } else {
+      router.push(`/conversations/${c.id}/profile`);
+    }
   };
 
   const handleDeleteClick = () => {
@@ -206,6 +213,15 @@ export function ConversationItem({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Image Preview Modal */}
+      <ImagePreview
+        src={imageSrc}
+        alt={imageAlt}
+        title={imageTitle}
+        isOpen={isOpen}
+        onClose={closePreview}
+      />
     </>
   );
 }

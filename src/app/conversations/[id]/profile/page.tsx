@@ -10,6 +10,7 @@ import { ArrowLeft, Users, Calendar, Clock, MessageCircle, Phone, Video, UserPlu
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useRef } from "react";
+import { ImagePreview, useImagePreview } from "@/components/ui/image-preview";
 import type { Conversation } from "@/domains/chat/types";
 
 // Extended type to include user_type in other_user
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const updateConversationMutation = useUpdateConversation();
   const uploadFileMutation = useUploadFile();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isOpen, imageSrc, imageAlt, imageTitle, openPreview, closePreview } = useImagePreview();
   
   const conversation = conversations?.find(c => c.id === conversationId) as ConversationWithUserType | undefined;
   
@@ -130,12 +132,22 @@ export default function ProfilePage() {
             className="text-center"
           >
             <div className="relative inline-block">
-              <Avatar className="h-32 w-32 mx-auto mb-4">
-                <AvatarImage src={avatarUrl || undefined} alt={title} />
-                <AvatarFallback className="bg-emerald-600 text-white text-4xl">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <button
+                onClick={() => {
+                  if (avatarUrl) {
+                    openPreview(avatarUrl, `${title} Avatar`, title);
+                  }
+                }}
+                disabled={!avatarUrl}
+                className="block hover:opacity-80 transition-opacity disabled:cursor-default disabled:hover:opacity-100"
+              >
+                <Avatar className="h-32 w-32 mx-auto mb-4">
+                  <AvatarImage src={avatarUrl || undefined} alt={title} />
+                  <AvatarFallback className="bg-emerald-600 text-white text-4xl">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
               
               {/* Camera icon for group chats only */}
               {isGroup && (
@@ -319,12 +331,23 @@ export default function ProfilePage() {
                         }
                       }}
                     >
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={participant.avatar_url} alt={fullName} />
-                        <AvatarFallback className="bg-emerald-600 text-white">
-                          {participantInitials}
-                        </AvatarFallback>
-                      </Avatar>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (participant.avatar_url) {
+                            openPreview(participant.avatar_url, `${fullName} Avatar`, fullName);
+                          }
+                        }}
+                        disabled={!participant.avatar_url}
+                        className="hover:opacity-80 transition-opacity disabled:cursor-default disabled:hover:opacity-100"
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={participant.avatar_url} alt={fullName} />
+                          <AvatarFallback className="bg-emerald-600 text-white">
+                            {participantInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
                       
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">
@@ -375,6 +398,15 @@ export default function ProfilePage() {
           </motion.div>
         </div>
       </ScrollArea>
+      
+      {/* Image Preview Modal */}
+      <ImagePreview
+        src={imageSrc}
+        alt={imageAlt}
+        title={imageTitle}
+        isOpen={isOpen}
+        onClose={closePreview}
+      />
     </div>
   );
 }
