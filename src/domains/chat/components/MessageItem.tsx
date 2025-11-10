@@ -415,7 +415,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className={`absolute -bottom-1 ${isMine ? "right-2" : "left-2"} bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 shadow-md z-10`}
+              className={`absolute -bottom-1 left-2 bg-white dark:bg-[#1f2c33] border border-border rounded-full px-2 py-0.5 shadow-md z-10`}
               style={{ 
                 maxWidth: 'calc(100% - 0.5rem)'
               }}

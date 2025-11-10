@@ -193,7 +193,18 @@ function ChatsPageContent() {
         <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
           {/* WhatsApp-style Header - Hidden on mobile when conversation selected, always visible on desktop */}
           <div className={`bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between ${selectedId ? 'hidden md:flex' : 'flex'}`}>
-            <h1 className="text-xl font-semibold text-white">Chats</h1>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0 md:hidden"
+                onClick={toggleMobileSidebar}
+                title="Toggle Sidebar"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h1 className="text-xl font-semibold text-white">Chats</h1>
+            </div>
             <div className="flex items-center gap-4">
               <Button 
                 variant="ghost" 
