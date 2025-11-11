@@ -13,6 +13,7 @@ interface FileUploadModalProps {
   onUpload: (files: File[]) => Promise<void>;
   conversationId: string;
   onOptimisticMessage?: (files: File[], text?: string) => void;
+  fileType?: 'image' | 'video' | 'audio' | 'document' | 'media' | null;
 }
 
 // Removed FileWithPreview interface - now using UploadFile from upload-progress component
@@ -21,23 +22,69 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_FILES = 10;
 
 const ACCEPTED_TYPES = {
-  image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  video: ['video/mp4', 'video/webm', 'video/avi', 'video/mov'],
-  audio: ['audio/mp3', 'audio/wav', 'audio/m4a', 'audio/ogg'],
+  image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp', 'image/tiff'],
+  video: ['video/mp4', 'video/webm', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/mkv', 'video/3gp'],
+  audio: [
+    'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/ogg', 
+    'audio/aac', 'audio/flac', 'audio/wma', 'audio/opus', 'audio/webm'
+  ],
   document: [
     'application/pdf',
     'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
     'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
     'text/plain',
-    'text/csv'
-  ]
+    'text/csv',
+    'application/rtf',
+    'application/vnd.oasis.opendocument.text', // .odt
+    'application/vnd.oasis.opendocument.spreadsheet', // .ods
+    'application/vnd.oasis.opendocument.presentation', // .odp
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/json',
+    'text/xml',
+    'application/xml'
+  ],
+  media: [] // Will be populated dynamically
+};
+
+// Helper function to get allowed file types based on filter
+const getAllowedTypes = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null): string[] => {
+  if (!fileType) {
+    return Object.values(ACCEPTED_TYPES).flat();
+  }
+  
+  if (fileType === 'media') {
+    return [...ACCEPTED_TYPES.image, ...ACCEPTED_TYPES.video];
+  }
+  
+  return ACCEPTED_TYPES[fileType] || [];
+};
+
+// Helper function to get file type description
+const getFileTypeDescription = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null): string => {
+  switch (fileType) {
+    case 'image':
+      return 'Images only';
+    case 'video':
+      return 'Videos only';
+    case 'audio':
+      return 'Audio files only';
+    case 'document':
+      return 'Documents (PDF, DOCX, XLSX, PPTX, TXT, CSV, etc.)';
+    case 'media':
+      return 'Images and videos';
+    default:
+      return 'Images, videos, audio, documents';
+  }
 };
 
 // Removed getFileType function - no longer needed
 
-export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }: FileUploadModalProps) {
+export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage, fileType }: FileUploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -51,8 +98,19 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }
 
   const handleFiles = (fileList: FileList | File[]) => {
     const validFiles: File[] = [];
+    const allowedTypes = getAllowedTypes(fileType);
     
     Array.from(fileList).forEach((file) => {
+      // Validate file type if filter is applied
+      if (fileType && !allowedTypes.includes(file.type)) {
+        toast({
+          variant: "destructive",
+          title: "Invalid file type",
+          description: `File "${file.name}" is not allowed. ${getFileTypeDescription(fileType)} only.`,
+        });
+        return;
+      }
+
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         toast({
@@ -138,7 +196,14 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Upload Files</DialogTitle>
+          <DialogTitle>
+            {fileType === 'audio' ? 'Upload Audio Files' :
+             fileType === 'document' ? 'Upload Documents' :
+             fileType === 'media' ? 'Upload Images/Videos' :
+             fileType === 'image' ? 'Upload Images' :
+             fileType === 'video' ? 'Upload Videos' :
+             'Upload Files'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
@@ -166,7 +231,7 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }
               </button>
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Images, videos, audio, documents • Max 100MB each • {MAX_FILES} files max
+              {getFileTypeDescription(fileType)} • Max 100MB each • {MAX_FILES} files max
             </p>
             
             <input
@@ -175,7 +240,7 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }
               multiple
               onChange={(e) => e.target.files && handleFiles(e.target.files)}
               className="hidden"
-              accept={Object.values(ACCEPTED_TYPES).flat().join(',')}
+              accept={getAllowedTypes(fileType).join(',')}
             />
           </div>
 

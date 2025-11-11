@@ -403,6 +403,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFileUploadOptions, setShowFileUploadOptions] = useState(false);
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [fileUploadType, setFileUploadType] = useState<'image' | 'video' | 'audio' | 'document' | 'media' | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{
     id: string;
@@ -809,28 +810,19 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                   type="button"
                   onClick={() => {
                     setShowFileUploadOptions(false);
+                    setFileUploadType('media');
                     setShowFileUploadModal(true);
                   }}
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
                 >
                   <ImageIcon className="h-5 w-5 text-blue-500" />
-                  <span>Add Image</span>
+                  <span>Add Image/Video</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowFileUploadOptions(false);
-                    setShowFileUploadModal(true);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
-                >
-                  <Video className="h-5 w-5 text-red-500" />
-                  <span>Add Video</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFileUploadOptions(false);
+                    setFileUploadType('audio');
                     setShowFileUploadModal(true);
                   }}
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
@@ -842,6 +834,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                   type="button"
                   onClick={() => {
                     setShowFileUploadOptions(false);
+                    setFileUploadType('document');
                     setShowFileUploadModal(true);
                   }}
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
@@ -876,10 +869,14 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
       {/* File Upload Modal */}
       <FileUploadModal
         open={showFileUploadModal}
-        onClose={() => setShowFileUploadModal(false)}
+        onClose={() => {
+          setShowFileUploadModal(false);
+          setFileUploadType(null);
+        }}
         onUpload={handleFileUpload}
         conversationId={conversationId}
         onOptimisticMessage={handleOptimisticMessage}
+        fileType={fileUploadType}
       />
     </div>
   );
