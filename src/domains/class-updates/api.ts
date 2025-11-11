@@ -2,6 +2,7 @@ import { http } from "@/core/http/axios";
 
 const axiosInstance = http();
 import type { ClassUpdate, Comment } from "./types";
+import { formatAttachmentForBackend } from "./attachmentUtils";
 
 export interface ClassUpdateFilters {
   search?: string;
@@ -243,19 +244,26 @@ export interface CreateClassUpdateData {
   update_type?: 'announcement' | 'homework' | 'reminder' | 'event';
   is_pinned?: boolean;
   attachments?: AttachmentInput[];
+  uploadedBy?: string; // Add this to pass current user ID
 }
 
 export async function createClassUpdate(data: CreateClassUpdateData): Promise<ClassUpdate> {
-  // Transform attachments to backend format
-  const backendAttachments = data.attachments?.map(att => ({
-    id: att.id,
-    originalName: att.originalName || att.name || att.fileName || 'unknown',
-    fileName: att.fileName || att.name || 'unknown',
-    mimeType: att.mimeType || att.type || 'application/octet-stream',
-    size: att.size,
-    url: att.url,
-    key: att.key,
-  }));
+  // Get current user profile for uploadedBy field
+  let uploadedBy = data.uploadedBy;
+  if (!uploadedBy) {
+    try {
+      const { data: profileData } = await axiosInstance.get('/auth/me');
+      uploadedBy = profileData.id || 'unknown';
+    } catch {
+      console.warn('Failed to get current user profile, using fallback ID');
+      uploadedBy = 'unknown';
+    }
+  }
+
+  // Transform attachments to backend format with all required fields
+  const backendAttachments = data.attachments?.map(att => 
+    formatAttachmentForBackend(att, uploadedBy || 'unknown')
+  );
   
   const { data: response } = await axiosInstance.post(`/classes/${data.class_id}/updates`, {
     class_id: data.class_id, // Required by validation schema
@@ -313,8 +321,6 @@ export async function createClassUpdate(data: CreateClassUpdateData): Promise<Cl
 }
 
 export async function uploadAttachments(classId: string, files: File[]): Promise<BackendAttachment[]> {
-  const startTime = Date.now();
-  
   try {
     // Step 1: Get presigned URLs from backend
     const filesInfo = files.map(f => ({
@@ -387,20 +393,27 @@ export async function updateClassUpdate(
     content?: string;
     update_type?: 'announcement' | 'homework' | 'reminder' | 'event';
     attachments?: AttachmentInput[];
+    uploadedBy?: string;
   }
 ): Promise<ClassUpdate> {
-  // Transform attachments to backend format
+  // Get current user profile for uploadedBy field
+  let uploadedBy = data.uploadedBy;
+  if (!uploadedBy && data.attachments && data.attachments.length > 0) {
+    try {
+      const { data: profileData } = await axiosInstance.get('/auth/me');
+      uploadedBy = profileData.id || 'unknown';
+    } catch {
+      console.warn('Failed to get current user profile, using fallback ID');
+      uploadedBy = 'unknown';
+    }
+  }
+
+  // Transform attachments to backend format with all required fields
   const backendData = {
     ...data,
-    attachments: data.attachments?.map(att => ({
-      id: att.id,
-      originalName: att.originalName || att.name || att.fileName || 'unknown',
-      fileName: att.fileName || att.name || 'unknown',
-      mimeType: att.mimeType || att.type || 'application/octet-stream',
-      size: att.size,
-      url: att.url,
-      key: att.key,
-    })),
+    attachments: data.attachments?.map(att => 
+      formatAttachmentForBackend(att, uploadedBy || 'unknown')
+    ),
   };
   
   const { data: response } = await axiosInstance.put(`/class-updates/${updateId}`, backendData);
