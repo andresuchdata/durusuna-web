@@ -428,6 +428,18 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   
   useChatRealtime(conversationId, {
     onMessageNew: () => {
+      // Clear any remaining optimistic messages when real message arrives
+      // This prevents gap between optimistic completion and real message appearance
+      setTimeout(() => {
+        setOptimisticMessages(prev => {
+          // Only clear optimistic messages that are fully uploaded (100% progress)
+          return prev.filter(msg => {
+            const allFilesComplete = Object.values(msg.uploadProgress).every(progress => progress === 100);
+            return !allFilesComplete; // Keep messages that aren't fully uploaded yet
+          });
+        });
+      }, 100); // Small delay to ensure real message is in DOM first
+      
       // Message will be added via the hook, scroll after state updates
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -713,6 +725,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                 }}
                 conversationType={conversation?.type}
                 uploadProgress={optimisticMsg.uploadProgress}
+                me={me || undefined}
               />
             ))}
             

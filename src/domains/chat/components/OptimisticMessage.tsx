@@ -18,6 +18,7 @@ export interface OptimisticMessageProps {
   };
   conversationType?: "direct" | "group";
   uploadProgress?: Record<string, number>; // fileId -> progress percentage
+  me?: string; // Current user ID for positioning
 }
 
 export function OptimisticMessage({ 
@@ -25,9 +26,13 @@ export function OptimisticMessage({
   files, 
   sender, 
   conversationType = "group",
-  uploadProgress = {}
+  uploadProgress = {},
+  me
 }: OptimisticMessageProps) {
   const hasText = text && text.trim().length > 0;
+  
+  // Determine if this is the current user's message for positioning
+  const isMine = sender.id === me;
   
   // Convert files to media items with loading state and progress
   const mediaItems = files
@@ -98,11 +103,11 @@ export function OptimisticMessage({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 0.7, y: 0 }} // Slightly transparent to show it's optimistic
-      className="flex items-start gap-3 px-4 py-2"
+      className={`flex gap-2 px-4 py-2 ${isMine ? "justify-end" : "justify-start"}`}
     >
-      {/* Avatar - only show in group conversations */}
-      {conversationType === "group" && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
+      {/* Avatar for others' messages (only in group chats) */}
+      {!isMine && conversationType === "group" && (
+        <Avatar className="h-8 w-8 flex-shrink-0 mt-1">
           <AvatarImage src={sender.avatar_url} />
           <AvatarFallback className="text-xs">
             {sender.first_name?.[0]}{sender.last_name?.[0]}
@@ -110,30 +115,24 @@ export function OptimisticMessage({
         </Avatar>
       )}
 
-      <div className="flex-1 min-w-0">
-        {/* Sender name - only show in group conversations */}
-        {conversationType === "group" && (
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-emerald-600">
-              {sender.first_name} {sender.last_name}
-            </span>
-          </div>
+      <div className={`flex flex-col ${isMine ? "items-end" : "items-start"} max-w-[75%] md:max-w-[60%] w-full min-w-0`}>
+        {/* Sender name for others' messages (only in group chats) */}
+        {!isMine && conversationType === "group" && (
+          <span className="text-xs text-muted-foreground mb-0.5 px-2">
+            {sender.first_name} {sender.last_name}
+          </span>
         )}
 
         {/* Message bubble */}
-        <div className={`relative w-fit min-w-[80px] ${
-          hasText && text.length > 50 
-            ? 'max-w-[85%]' 
-            : hasText && text.length > 20
-              ? 'max-w-[80%]' 
-              : mediaItems.length > 0 || fileAttachments.length > 0
-                ? 'max-w-[70%]'
-                : 'max-w-[70%]'
-        }`}>
+        <div className="relative w-fit min-w-[80px] max-w-full">
           <div
             className={`
               message-bubble rounded-2xl shadow-sm w-full overflow-hidden 
-              transition-all duration-200 bg-emerald-500 text-white
+              transition-all duration-200 
+              ${isMine 
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-white dark:bg-gray-800 text-foreground border border-border'
+              }
               ${hasText ? 'px-4 py-2' : mediaItems.length > 0 || fileAttachments.length > 0 ? 'p-2' : 'px-4 py-2'}
             `}
           >

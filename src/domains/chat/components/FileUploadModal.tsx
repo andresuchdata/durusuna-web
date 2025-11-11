@@ -101,12 +101,29 @@ export function FileUploadModal({ open, onClose, onUpload, fileType }: FileUploa
     const allowedTypes = getAllowedTypes(fileType);
     
     Array.from(fileList).forEach((file) => {
+      // Debug logging for document types
+      if (fileType === 'document') {
+        console.log('Document file validation:', {
+          fileName: file.name,
+          fileType: file.type,
+          allowedTypes,
+          isAllowed: allowedTypes.includes(file.type)
+        });
+      }
+      
       // Validate file type if filter is applied
       if (fileType && !allowedTypes.includes(file.type)) {
+        console.error('File type validation failed:', {
+          fileName: file.name,
+          fileType: file.type,
+          filterType: fileType,
+          allowedTypes
+        });
+        
         toast({
           variant: "destructive",
           title: "Invalid file type",
-          description: `File "${file.name}" is not allowed. ${getFileTypeDescription(fileType)} only.`,
+          description: `File "${file.name}" (${file.type}) is not allowed. ${getFileTypeDescription(fileType)} only.`,
         });
         return;
       }
