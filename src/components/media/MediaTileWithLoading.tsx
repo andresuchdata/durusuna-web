@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FileText, Loader2 } from "lucide-react";
+import { CircularProgress } from "@/components/ui/circular-progress";
 
 export interface MediaTileProps {
   item: {
@@ -10,6 +11,7 @@ export interface MediaTileProps {
     url: string;
     type?: string;
     size?: number;
+    progress?: number; // 0-100 for upload progress
   };
   isLoading?: boolean;
   onClick?: () => void;
@@ -57,9 +59,13 @@ export function MediaTileWithLoading({
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white/90 rounded-full p-3">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-900" />
-          </div>
+          {item.progress !== undefined && item.progress >= 0 ? (
+            <CircularProgress progress={item.progress} size={48} />
+          ) : (
+            <div className="bg-white/90 rounded-full p-3">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-900" />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -74,6 +80,7 @@ export interface MediaGridWithLoadingProps {
     type?: string;
     size?: number;
     isLoading?: boolean;
+    progress?: number; // 0-100 for upload progress
   }>;
   onItemClick?: (index: number) => void;
 }

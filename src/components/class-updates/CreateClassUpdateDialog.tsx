@@ -19,13 +19,19 @@ interface CreateClassUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   classes?: Array<{ id: string; name: string }>;
+  onOptimisticCreate?: (formData: ClassUpdateFormData, uploadProgress?: Record<string, number>) => string;
+  onOptimisticProgressUpdate?: (updateId: string, fileId: string, progress: number) => void;
+  onOptimisticRemove?: (updateId: string) => void;
 }
 
 export function CreateClassUpdateDialog({ 
   open, 
   onOpenChange, 
   onSuccess,
-  classes = []
+  classes = [],
+  onOptimisticCreate,
+  onOptimisticProgressUpdate,
+  onOptimisticRemove
 }: CreateClassUpdateDialogProps) {
   const [formData, setFormData] = useState<ClassUpdateFormData>({
     classId: '',
@@ -71,6 +77,35 @@ export function CreateClassUpdateDialog({
       return;
     }
 
+    // Close dialog immediately for better UX
+    onOpenChange(false);
+
+    // Create optimistic update if handler is provided
+    let optimisticId: string | undefined;
+    if (onOptimisticCreate) {
+      // Initialize progress for all uploaded attachments
+      const initialProgress: Record<string, number> = {};
+      formData.uploadedAttachments.forEach(att => {
+        // Use multiple possible keys for consistency
+        const possibleKeys = [
+          att.id,
+          att.fileName,
+          att.originalName,
+          (att.name || 'unknown') + att.size,
+          att.size?.toString()
+        ].filter(Boolean);
+        
+        // Set progress to 100% for all possible keys since files are already uploaded
+        possibleKeys.forEach(key => {
+          initialProgress[key as string] = 100;
+        });
+      });
+      
+      // If there are attachments, show them as uploading initially for visual feedback
+      const hasAttachments = formData.uploadedAttachments.length > 0;
+      optimisticId = onOptimisticCreate(formData, initialProgress);
+    }
+
     setIsSubmitting(true);
     try {
       const data: CreateClassUpdateData = {
@@ -83,6 +118,13 @@ export function CreateClassUpdateDialog({
 
       await createClassUpdate(data);
       
+      // Remove optimistic update after successful creation
+      if (optimisticId && onOptimisticRemove) {
+        setTimeout(() => {
+          onOptimisticRemove(optimisticId!);
+        }, 1000); // Small delay to allow real update to appear
+      }
+      
       // Reset form
       setFormData({
         classId: '',
@@ -94,11 +136,17 @@ export function CreateClassUpdateDialog({
       });
       setErrors({});
       
-      onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       console.error('Failed to create class update:', error);
+      
+      // Remove optimistic update on error
+      if (optimisticId && onOptimisticRemove) {
+        onOptimisticRemove(optimisticId);
+      }
+      
       setErrors({ submit: 'Failed to create update. Please try again.' });
+      onOpenChange(true); // Reopen dialog on error
     } finally {
       setIsSubmitting(false);
     }

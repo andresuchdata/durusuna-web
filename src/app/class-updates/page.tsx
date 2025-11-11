@@ -12,6 +12,8 @@ import { Heart, MessageCircle, Share2, ChevronUp, Send, Bookmark, Search, Filter
 import { Input } from "@/components/ui/input";
 import { CreateClassUpdateDialog } from "@/components/class-updates/CreateClassUpdateDialog";
 import { EditClassUpdateDialog } from "@/components/class-updates/EditClassUpdateDialog";
+import { OptimisticClassUpdate } from "@/components/class-updates/OptimisticClassUpdate";
+import type { ClassUpdateFormData } from "@/components/class-updates/ClassUpdateForm";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -135,6 +137,12 @@ export default function ClassUpdatesPage() {
   const [filters, setFilters] = useState<ClassUpdateFilters>({});
   const [activeFilters, setActiveFilters] = useState<ClassUpdateFilters>({});
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Array<{
+    id: string;
+    formData: ClassUpdateFormData;
+    uploadProgress: Record<string, number>;
+    isUploading: boolean;
+  }>>([]);
   const { data: profile } = useProfile();
 
   // Debounced search
@@ -184,6 +192,42 @@ export default function ClassUpdatesPage() {
 
   const handleCreateSuccess = () => {
     refetch();
+  };
+
+  // Handle optimistic class update creation
+  const handleOptimisticCreate = (formData: ClassUpdateFormData, uploadProgress: Record<string, number> = {}) => {
+    const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
+    setOptimisticUpdates(prev => [...prev, {
+      id: optimisticId,
+      formData,
+      uploadProgress,
+      isUploading: Object.keys(uploadProgress).length > 0
+    }]);
+    
+    // Remove optimistic update after timeout
+    setTimeout(() => {
+      setOptimisticUpdates(prev => prev.filter(update => update.id !== optimisticId));
+    }, 15000); // 15 seconds timeout
+    
+    return optimisticId;
+  };
+
+  // Update progress for optimistic update
+  const updateOptimisticProgress = (updateId: string, fileId: string, progress: number) => {
+    setOptimisticUpdates(prev => prev.map(update => 
+      update.id === updateId
+        ? {
+            ...update,
+            uploadProgress: { ...update.uploadProgress, [fileId]: progress },
+            isUploading: progress < 100
+          }
+        : update
+    ));
+  };
+
+  // Remove optimistic update
+  const removeOptimisticUpdate = (updateId: string) => {
+    setOptimisticUpdates(prev => prev.filter(update => update.id !== updateId));
   };
 
   // Check if user is a teacher (can create updates)
@@ -398,16 +442,35 @@ export default function ClassUpdatesPage() {
             <p className="text-sm text-red-600 mb-2">Failed to load class updates</p>
             <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
           </div>
-        ) : data && data.length > 0 ? (
-          <div className="space-y-4">
-            {data.map((update) => (
-              <ClassUpdateCard key={update.id} update={update} onUpdate={refetch} />
-            ))}
-          </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No updates yet.</p>
-            <p className="text-sm mt-2">Check back later for announcements and updates</p>
+          <div className="space-y-4">
+            {/* Optimistic updates */}
+            {optimisticUpdates.map((optimisticUpdate) => (
+              <OptimisticClassUpdate
+                key={optimisticUpdate.id}
+                formData={optimisticUpdate.formData}
+                author={{
+                  id: profile?.id || '',
+                  name: `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'You',
+                  avatar: profile?.avatar_url || undefined,
+                }}
+                className={classes?.find(c => c.id === optimisticUpdate.formData.classId)?.name}
+                uploadProgress={optimisticUpdate.uploadProgress}
+                isUploading={optimisticUpdate.isUploading}
+              />
+            ))}
+            
+            {/* Regular updates */}
+            {data && data.length > 0 ? (
+              data.map((update) => (
+                <ClassUpdateCard key={update.id} update={update} onUpdate={refetch} />
+              ))
+            ) : optimisticUpdates.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No updates yet.</p>
+                <p className="text-sm mt-2">Check back later for announcements and updates</p>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -428,6 +491,9 @@ export default function ClassUpdatesPage() {
           onOpenChange={setCreateDialogOpen}
           onSuccess={handleCreateSuccess}
           classes={classes}
+          onOptimisticCreate={handleOptimisticCreate}
+          onOptimisticProgressUpdate={updateOptimisticProgress}
+          onOptimisticRemove={removeOptimisticUpdate}
         />
       </div>
     </AppLayout>

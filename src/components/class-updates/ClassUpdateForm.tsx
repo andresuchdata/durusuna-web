@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Upload, FileText, Image as ImageIcon, Video, File, Loader2 } from "lucide-react";
+import { X, Upload, FileText, Image as ImageIcon, Video, File } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { AttachmentData } from "@/shared/types/attachment";
 import { 
@@ -20,7 +20,7 @@ import {
   getAttachmentMimeType, 
   getAttachmentSizeFormatted
 } from "@/shared/types/attachment";
-import { UploadProgress, useUploadProgress } from "@/components/ui/upload-progress";
+import { UploadProgress, useUploadProgress, type UploadFile } from "@/components/ui/upload-progress";
 import { uploadAttachmentsWithProgress } from "@/shared/utils/upload-with-progress";
 
 const UPDATE_TYPES = [
@@ -98,6 +98,7 @@ export function ClassUpdateForm({
     removeFile: removeUploadFile,
     clearFiles,
   } = useUploadProgress();
+  const activeUploadsRef = useRef(0);
 
   // Track initialization to prevent loops
   const initializedRef = useRef<string | null>(null);
@@ -127,34 +128,138 @@ export function ClassUpdateForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialKey]);
 
+  const startUpload = async (filesToUpload: UploadFile[]) => {
+    if (!formData.classId || filesToUpload.length === 0) {
+      return;
+    }
+
+    activeUploadsRef.current += 1;
+    onUploadingChange(true);
+
+    try {
+      filesToUpload.forEach(file => {
+        updateFileStatus(file.id, 'uploading');
+      });
+
+      const attachments = await uploadAttachmentsWithProgress(
+        formData.classId,
+        filesToUpload.map(file => file.file),
+        {
+          onProgress: (fileIndex, progress) => {
+            const targetFile = filesToUpload[fileIndex];
+            if (targetFile) {
+              updateFileProgress(targetFile.id, progress);
+            }
+          },
+          onFileComplete: (fileIndex) => {
+            const targetFile = filesToUpload[fileIndex];
+            if (targetFile) {
+              updateFileStatus(targetFile.id, 'completed');
+            }
+          },
+        }
+      );
+
+      onFormDataChange({
+        uploadedAttachments: [
+          ...formData.uploadedAttachments,
+          ...(attachments as AttachmentData[]),
+        ],
+      });
+
+      filesToUpload.forEach(file => {
+        removeUploadFile(file.id);
+      });
+
+      if (errors.files) {
+        const rest = { ...errors };
+        delete rest.files;
+        onErrorsChange(rest);
+      }
+    } catch (error: unknown) {
+      console.error('Failed to upload files:', error);
+
+      filesToUpload.forEach(file => {
+        updateFileStatus(file.id, 'error', 'Upload failed');
+      });
+
+      const err = error as {
+        message?: string;
+        response?: { data?: { message?: string }; status?: number };
+        code?: string;
+      };
+      const errorDetails = {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status,
+        code: err?.code,
+        isTimeout: err?.code === 'ECONNABORTED',
+      };
+      console.error('Error details:', JSON.stringify(errorDetails, null, 2));
+
+      let errorMessage = 'Failed to upload files. Please try again.';
+      if (err?.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timed out. Please try with smaller files or check your connection.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+
+      onErrorsChange({ ...errors, files: errorMessage });
+    } finally {
+      activeUploadsRef.current = Math.max(0, activeUploadsRef.current - 1);
+      if (activeUploadsRef.current === 0) {
+        onUploadingChange(false);
+      }
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!formData.classId) {
+      onErrorsChange({ ...errors, files: 'Please select a class first' });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     const selectedFiles = Array.from(e.target.files || []);
     const validFiles: File[] = [];
-    const newErrors: Record<string, string> = {};
+    let fileError: string | undefined;
 
-    const totalAttachments = 
-      formData.existingAttachments.length + 
-      formData.uploadedAttachments.length + 
+    const totalAttachments =
+      formData.existingAttachments.length +
+      formData.uploadedAttachments.length +
       uploadFiles.length;
 
     selectedFiles.forEach((file) => {
       if (totalAttachments + validFiles.length >= MAX_FILES) {
-        newErrors.files = `Maximum ${MAX_FILES} files allowed`;
+        fileError = `Maximum ${MAX_FILES} files allowed`;
         return;
       }
       if (file.size > MAX_FILE_SIZE) {
-        newErrors.files = `File "${file.name}" exceeds 5MB limit`;
+        fileError = `File "${file.name}" exceeds 5MB limit`;
         return;
       }
       validFiles.push(file);
     });
 
     if (validFiles.length > 0) {
-      addFiles(validFiles);
+      const newlyAddedFiles = addFiles(validFiles);
+      if (newlyAddedFiles.length > 0) {
+        void startUpload(newlyAddedFiles);
+      }
     }
-    onErrorsChange(newErrors);
-    
-    // Reset file input
+
+    if (fileError) {
+      onErrorsChange({ ...errors, files: fileError });
+    } else if (errors.files) {
+      const rest = { ...errors };
+      delete rest.files;
+      onErrorsChange(rest);
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -166,74 +271,6 @@ export function ClassUpdateForm({
     onFormDataChange({
       existingAttachments: formData.existingAttachments.filter((_, i) => i !== index),
     });
-  };
-
-  const handleUploadFiles = async () => {
-    if (!formData.classId) {
-      onErrorsChange({ files: 'Please select a class first' });
-      return;
-    }
-
-    if (uploadFiles.length === 0) return;
-
-    onUploadingChange(true);
-    try {
-      // Mark all files as uploading
-      uploadFiles.forEach(file => {
-        updateFileStatus(file.id, 'uploading');
-      });
-
-      const fileObjects = uploadFiles.map(f => f.file);
-      
-      const attachments = await uploadAttachmentsWithProgress(formData.classId, fileObjects, {
-        onProgress: (fileIndex, progress) => {
-          if (uploadFiles[fileIndex]) {
-            updateFileProgress(uploadFiles[fileIndex].id, progress);
-          }
-        },
-        onFileComplete: (fileIndex) => {
-          if (uploadFiles[fileIndex]) {
-            updateFileStatus(uploadFiles[fileIndex].id, 'completed');
-          }
-        },
-      });
-
-      onFormDataChange({
-        uploadedAttachments: [...formData.uploadedAttachments, ...attachments as AttachmentData[]],
-      });
-      clearFiles();
-      onErrorsChange({});
-    } catch (error: unknown) {
-      console.error('Failed to upload files:', error);
-      
-      // Mark all files as error
-      uploadFiles.forEach(file => {
-        updateFileStatus(file.id, 'error', 'Upload failed');
-      });
-      
-      const err = error as { message?: string; response?: { data?: { message?: string }; status?: number }; code?: string };
-      const errorDetails = {
-        message: err?.message,
-        response: err?.response?.data,
-        status: err?.response?.status,
-        code: err?.code,
-        isTimeout: err?.code === 'ECONNABORTED',
-      };
-      console.error('Error details:', JSON.stringify(errorDetails, null, 2));
-      
-      let errorMessage = 'Failed to upload files. Please try again.';
-      if (err?.code === 'ECONNABORTED') {
-        errorMessage = 'Upload timed out. Please try with smaller files or check your connection.';
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-      
-      onErrorsChange({ files: errorMessage });
-    } finally {
-      onUploadingChange(false);
-    }
   };
 
   const handleRemoveUploadedAttachment = (index: number) => {
@@ -390,6 +427,8 @@ export function ClassUpdateForm({
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
                   Images, videos, documents (max {mode === 'edit' ? `${MAX_FILES - totalAttachments} more` : MAX_FILES} files, 5MB each)
+                  <br />
+                  Uploads start automatically after selection.
                 </p>
               </div>
             </div>
@@ -400,22 +439,12 @@ export function ClassUpdateForm({
           {uploadFiles.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Files to upload ({uploadFiles.length})</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleUploadFiles}
-                  disabled={isUploading || !formData.classId || uploadFiles.some(f => f.status === 'uploading')}
-                >
-                  {isUploading || uploadFiles.some(f => f.status === 'uploading') ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    'Upload Files'
-                  )}
-                </Button>
+                <p className="text-sm font-medium">
+                  {isUploading ? 'Uploading attachments…' : 'Attachments ready to upload'}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    ({uploadFiles.length} {uploadFiles.length === 1 ? 'file' : 'files'})
+                  </span>
+                </p>
               </div>
               <UploadProgress
                 files={uploadFiles}

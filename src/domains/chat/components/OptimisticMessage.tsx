@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MediaGridWithLoading } from "@/components/media/MediaTileWithLoading";
 import { FileAttachment } from "./FileAttachment";
 import { Loader2 } from "lucide-react";
+import { CircularProgress } from "@/components/ui/circular-progress";
 
 export interface OptimisticMessageProps {
   text?: string;
@@ -28,38 +29,46 @@ export function OptimisticMessage({
 }: OptimisticMessageProps) {
   const hasText = text && text.trim().length > 0;
   
-  // Convert files to media items with loading state
+  // Convert files to media items with loading state and progress
   const mediaItems = files
     .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
-    .map(file => ({
-      id: file.name + file.size, // Simple ID
-      name: file.name,
-      url: URL.createObjectURL(file), // Create preview URL
-      type: file.type,
-      size: file.size,
-      isLoading: true, // Always loading for optimistic messages
-    }));
+    .map(file => {
+      const fileId = file.name + file.size;
+      return {
+        id: fileId,
+        name: file.name,
+        url: URL.createObjectURL(file), // Create preview URL
+        type: file.type,
+        size: file.size,
+        isLoading: true, // Always loading for optimistic messages
+        progress: uploadProgress[fileId] || 0, // Get progress for this file
+      };
+    });
 
-  // Convert files to file attachments
+  // Convert files to file attachments with progress
   const fileAttachments = files
     .filter(file => !file.type.startsWith('image/') && !file.type.startsWith('video/'))
-    .map(file => ({
-      id: file.name + file.size,
-      fileName: file.name,
-      originalName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      url: '', // No URL for non-media files
-      key: file.name,
-      fileType: getFileType(file.type),
-      isImage: false,
-      isVideo: false,
-      isAudio: file.type.startsWith('audio/'),
-      isDocument: isDocumentType(file.type),
-      sizeFormatted: formatFileSize(file.size),
-      uploadedBy: sender.id,
-      uploadedAt: new Date().toISOString(),
-    }));
+    .map(file => {
+      const fileId = file.name + file.size;
+      return {
+        id: fileId,
+        fileName: file.name,
+        originalName: file.name,
+        mimeType: file.type,
+        size: file.size,
+        url: '', // No URL for non-media files
+        key: file.name,
+        fileType: getFileType(file.type),
+        isImage: false,
+        isVideo: false,
+        isAudio: file.type.startsWith('audio/'),
+        isDocument: isDocumentType(file.type),
+        sizeFormatted: formatFileSize(file.size),
+        uploadedBy: sender.id,
+        uploadedAt: new Date().toISOString(),
+        progress: uploadProgress[fileId] || 0, // Get progress for this file
+      };
+    });
 
   function getFileType(mimeType: string): 'image' | 'video' | 'audio' | 'document' | 'other' {
     if (mimeType.startsWith('image/')) return 'image';
@@ -144,9 +153,13 @@ export function OptimisticMessage({
                 {fileAttachments.map((attachment) => (
                   <div key={attachment.id} className="relative">
                     <FileAttachment attachment={attachment} />
-                    {/* Loading overlay for file attachments */}
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded">
-                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    {/* Loading overlay for file attachments with progress */}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded">
+                      {attachment.progress !== undefined && attachment.progress >= 0 ? (
+                        <CircularProgress progress={attachment.progress} size={32} />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      )}
                     </div>
                   </div>
                 ))}

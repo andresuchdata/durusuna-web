@@ -167,7 +167,7 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage, 
     try {
       const fileObjects = files.map(f => f.file);
       
-      // Create optimistic message immediately
+      // Create optimistic message immediately with file objects
       if (onOptimisticMessage) {
         onOptimisticMessage(fileObjects);
       }

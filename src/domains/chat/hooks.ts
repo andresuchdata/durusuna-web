@@ -424,12 +424,20 @@ export function useSendMessageWithFiles(conversationId: string) {
     mutationFn: ({ 
       text, 
       files, 
-      replyTo 
+      replyTo,
+      onProgress,
+      onFileComplete
     }: { 
       text: string; 
       files: File[]; 
-      replyTo?: string; 
-    }) => sendMessageWithFiles(conversationId, text, files, { replyTo }),
+      replyTo?: string;
+      onProgress?: (fileIndex: number, progress: number) => void;
+      onFileComplete?: (fileIndex: number, result: unknown) => void;
+    }) => sendMessageWithFiles(conversationId, text, files, { 
+      replyTo, 
+      onProgress, 
+      onFileComplete 
+    }),
     
     onSuccess: (newMessage) => {
       // Add the new message to the cache
