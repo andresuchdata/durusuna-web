@@ -106,15 +106,29 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
     ? `${m.sender.first_name[0]}${m.sender.last_name[0]}`
     : "?";
 
-  // Separate media files from document files
+  // Separate viewable media/documents from downloadable files
   const attachments = m.attachments || [];
   const mediaItems: MediaItem[] = [];
   const fileAttachments: typeof attachments = [];
 
-
   attachments.forEach((att) => {
     const type = att.mimeType || att.type || 'file';
-    if (type.startsWith('image/') || type.startsWith('video/') || type.startsWith('audio/')) {
+    
+    // Check if it's a viewable document type (similar to MediaViewer logic)
+    const isViewableDocument = 
+      type === 'application/pdf' ||
+      type.includes('word') || 
+      type.includes('document') ||
+      type.includes('spreadsheet') ||
+      type.includes('presentation') ||
+      type.includes('excel') ||
+      type.includes('powerpoint');
+    
+    // Include media files and viewable documents in mediaItems for MediaViewer
+    if (type.startsWith('image/') || 
+        type.startsWith('video/') || 
+        type.startsWith('audio/') ||
+        isViewableDocument) {
       mediaItems.push({
         id: att.id,
         name: att.originalName || att.fileName || att.type?.split('/').pop() || 'file',
@@ -123,6 +137,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
         size: att.size,
       });
     } else {
+      // Keep non-viewable file types as file attachments for download
       fileAttachments.push(att);
     }
   });

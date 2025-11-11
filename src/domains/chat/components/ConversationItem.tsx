@@ -20,6 +20,7 @@ import { Trash2 } from "lucide-react";
 import { deleteConversation } from "../api";
 import { formatConversationTime } from "@/lib/dateUtils";
 import { useQueryClient } from "@tanstack/react-query";
+import { generateAttachmentDescription } from "../utils/attachmentDescriptions";
 
 export function ConversationItem({ 
   c, 
@@ -54,7 +55,18 @@ export function ConversationItem({
   }
   
   // Handle both 'text' and 'content' fields for last message
-  const last = c.last_message?.text || c.last_message?.content || "No messages yet";
+  let last = c.last_message?.text || c.last_message?.content || "";
+  
+  // If no text content but has attachments, show attachment description
+  if (!last && c.last_message) {
+    const attachmentDesc = generateAttachmentDescription(c.last_message);
+    last = attachmentDesc || "No messages yet";
+  }
+  
+  // Final fallback
+  if (!last) {
+    last = "No messages yet";
+  }
   const initials = title
     .split(" ")
     .map((w) => w[0])

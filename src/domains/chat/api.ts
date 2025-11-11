@@ -68,14 +68,14 @@ function determineFileType(mimeType: string): 'image' | 'video' | 'audio' | 'doc
 function isDocumentType(mimeType: string): boolean {
   const documentTypes = [
     'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'text/csv',
+    'application/msword', // .doc files
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx files
+    'application/vnd.ms-excel', // .xls files
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx files
+    'application/vnd.ms-powerpoint', // .ppt files
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx files
+    'text/plain', // .txt files
+    'text/csv', // .csv files
   ];
   return documentTypes.includes(mimeType);
 }
