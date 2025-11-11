@@ -3,24 +3,19 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { X, Upload, Image as ImageIcon, Video, Music, File, FileText, AlertCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Upload } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { UploadProgress, useUploadProgress } from "@/components/ui/upload-progress";
 
 interface FileUploadModalProps {
   open: boolean;
   onClose: () => void;
   onUpload: (files: File[]) => Promise<void>;
   conversationId: string;
+  onOptimisticMessage?: (files: File[], text?: string) => void;
 }
 
-interface FileWithPreview {
-  file: File;
-  preview?: string;
-  type: 'image' | 'video' | 'audio' | 'document' | 'other';
-  progress: number;
-  error?: string;
-}
+// Removed FileWithPreview interface - now using UploadFile from upload-progress component
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_FILES = 10;
@@ -40,76 +35,50 @@ const ACCEPTED_TYPES = {
   ]
 };
 
-function getFileType(mimeType: string): 'image' | 'video' | 'audio' | 'document' | 'other' {
-  for (const [type, mimeTypes] of Object.entries(ACCEPTED_TYPES)) {
-    if (mimeTypes.includes(mimeType)) {
-      return type as 'image' | 'video' | 'audio' | 'document' | 'other';
-    }
-  }
-  return 'other';
-}
+// Removed getFileType function - no longer needed
 
-function getFileIcon(type: string) {
-  switch (type) {
-    case 'image': return <ImageIcon className="h-8 w-8 text-blue-500" />;
-    case 'video': return <Video className="h-8 w-8 text-red-500" />;
-    case 'audio': return <Music className="h-8 w-8 text-green-500" />;
-    case 'document': return <FileText className="h-8 w-8 text-purple-500" />;
-    default: return <File className="h-8 w-8 text-gray-500" />;
-  }
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-export function FileUploadModal({ open, onClose, onUpload, conversationId }: FileUploadModalProps) {
-  const [files, setFiles] = useState<FileWithPreview[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage }: FileUploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const {
+    files,
+    setFiles,
+    addFiles,
+    removeFile,
+    clearFiles,
+  } = useUploadProgress();
 
   const handleFiles = (fileList: FileList | File[]) => {
-    const newFiles: FileWithPreview[] = [];
+    const validFiles: File[] = [];
     
     Array.from(fileList).forEach((file) => {
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
-        alert(`File "${file.name}" is too large. Maximum size is 100MB.`);
+        toast({
+          variant: "destructive",
+          title: "File too large",
+          description: `File "${file.name}" is too large. Maximum size is 100MB.`,
+        });
         return;
       }
 
       // Check if we're exceeding max files
-      if (files.length + newFiles.length >= MAX_FILES) {
-        alert(`Maximum ${MAX_FILES} files allowed.`);
+      if (files.length + validFiles.length >= MAX_FILES) {
+        toast({
+          variant: "destructive",
+          title: "Too many files",
+          description: `Maximum ${MAX_FILES} files allowed.`,
+        });
         return;
       }
 
-      const fileType = getFileType(file.type);
-      const fileWithPreview: FileWithPreview = {
-        file,
-        type: fileType,
-        progress: 0,
-      };
-
-      // Create preview for images
-      if (fileType === 'image') {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          fileWithPreview.preview = e.target?.result as string;
-          setFiles(prev => [...prev]);
-        };
-        reader.readAsDataURL(file);
-      }
-
-      newFiles.push(fileWithPreview);
+      validFiles.push(file);
     });
 
-    setFiles(prev => [...prev, ...newFiles]);
+    if (validFiles.length > 0) {
+      addFiles(validFiles);
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -132,24 +101,32 @@ export function FileUploadModal({ open, onClose, onUpload, conversationId }: Fil
     }
   };
 
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
+  // removeFile function is now provided by useUploadProgress hook
 
   const handleUpload = async () => {
     if (files.length === 0) return;
     
-    setIsUploading(true);
     try {
       const fileObjects = files.map(f => f.file);
-      await onUpload(fileObjects);
-      setFiles([]);
+      
+      // Create optimistic message immediately
+      if (onOptimisticMessage) {
+        onOptimisticMessage(fileObjects);
+      }
+      
+      // Close modal immediately for better UX
+      clearFiles();
       onClose();
-    } catch (error) {
+      
+      // Call the onUpload callback which handles the actual upload
+      // This prevents duplicate uploads since onUpload (sendWithFiles) already handles progress
+      await onUpload(fileObjects);
+      
+    } catch (error: unknown) {
       console.error('Upload failed:', error);
-      // Handle error - you might want to show an error message
-    } finally {
-      setIsUploading(false);
+      
+      // Error handling is now done in the parent component (handleFileUpload)
+      // since that's where the actual upload happens
     }
   };
 
@@ -202,87 +179,34 @@ export function FileUploadModal({ open, onClose, onUpload, conversationId }: Fil
             />
           </div>
 
-          {/* File List */}
-          <AnimatePresence>
-            {files.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-4 space-y-2"
-              >
-                {files.map((fileWithPreview, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="flex items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
-                  >
-                    <div className="flex items-center flex-1 min-w-0">
-                      {fileWithPreview.preview ? (
-                        <img 
-                          src={fileWithPreview.preview} 
-                          alt=""
-                          className="h-12 w-12 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 flex items-center justify-center">
-                          {getFileIcon(fileWithPreview.type)}
-                        </div>
-                      )}
-                      
-                      <div className="ml-3 flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {fileWithPreview.file.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatFileSize(fileWithPreview.file.size)}
-                        </p>
-                        
-                        {isUploading && (
-                          <div className="mt-1">
-                            <Progress value={fileWithPreview.progress} className="h-2" />
-                          </div>
-                        )}
-                        
-                        {fileWithPreview.error && (
-                          <div className="mt-1 flex items-center text-red-600">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            <span className="text-xs">{fileWithPreview.error}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {!isUploading && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                        className="ml-2 h-8 w-8 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* File List with Progress */}
+          {files.length > 0 && (
+            <div className="mt-4">
+              <UploadProgress
+                files={files}
+                onFilesChange={setFiles}
+                onRemoveFile={removeFile}
+                showPreviews={true}
+                compact={false}
+              />
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <Button variant="outline" onClick={onClose} disabled={isUploading}>
+          <Button variant="outline" onClick={onClose} disabled={files.some(f => f.status === 'uploading')}>
             Cancel
           </Button>
           <Button 
             onClick={handleUpload} 
-            disabled={files.length === 0 || isUploading}
+            disabled={files.length === 0 || files.some(f => f.status === 'uploading')}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {isUploading ? 'Uploading...' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
+            {files.some(f => f.status === 'uploading') 
+              ? 'Uploading...' 
+              : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`
+            }
           </Button>
         </div>
       </DialogContent>

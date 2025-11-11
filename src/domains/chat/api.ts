@@ -1,5 +1,6 @@
 import { http } from "@/core/http/axios";
 import type { Conversation, Message } from "./types";
+import { uploadChatMediaWithProgress } from "@/shared/utils/upload-with-progress";
 
 export type Paginated<T> = {
   items: T[];
@@ -20,6 +21,7 @@ export async function getConversationMessages(
   const { data } = await http().get(`/conversations/${conversationId}/messages`, {
     params: cursor ? { cursor } : {},
   });
+  
   // Backend returns { messages: [], pagination: { hasMore, prevCursor } }
   // Transform to match expected format
   return {
@@ -28,21 +30,108 @@ export async function getConversationMessages(
   };
 }
 
+// Helper function to determine message type from attachments
+function determineMessageType(
+  attachments?: Array<{ type?: string; mimeType?: string }>,
+  defaultType: 'text' | 'image' | 'video' | 'audio' | 'file' | 'emoji' = 'text'
+): 'text' | 'image' | 'video' | 'audio' | 'file' | 'emoji' {
+  if (!attachments || attachments.length === 0) {
+    return defaultType;
+  }
+
+  // If multiple attachments, prioritize by type: video > image > audio > file
+  const types = attachments.map(att => {
+    const mimeType = att.mimeType || att.type || '';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return 'file';
+  });
+
+  // Return the highest priority type
+  if (types.includes('video')) return 'video';
+  if (types.includes('image')) return 'image';
+  if (types.includes('audio')) return 'audio';
+  return 'file';
+}
+
+// Helper function to determine file type category
+function determineFileType(mimeType: string): 'image' | 'video' | 'audio' | 'document' | 'other' {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (isDocumentType(mimeType)) return 'document';
+  return 'other';
+}
+
+// Helper function to check if mime type is a document
+function isDocumentType(mimeType: string): boolean {
+  const documentTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+  ];
+  return documentTypes.includes(mimeType);
+}
+
+// Helper function to format file size
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 export async function sendMessage(
   conversationId: string, 
   text: string,
   options?: {
     replyTo?: string;
-    attachments?: Array<{ id: string; url: string; type: string; name: string; size: number }>;
+    attachments?: Array<{
+      id: string;
+      fileName: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      url: string;
+      key: string;
+      fileType: 'image' | 'video' | 'audio' | 'document' | 'other';
+      isImage: boolean;
+      isVideo: boolean;
+      isAudio: boolean;
+      isDocument: boolean;
+      sizeFormatted: string;
+      uploadedBy: string;
+      uploadedAt: string;
+    }>;
   }
 ): Promise<Message> {
-  const { data } = await http().post(`/conversations/${conversationId}/messages`, { 
+  // Determine the correct message type based on attachments
+  const messageType = determineMessageType(
+    options?.attachments, 
+    text.trim() ? 'text' : 'file' // Default to 'file' if no text and no attachments, 'text' if text exists
+  );
+
+  const requestData: Record<string, unknown> = { 
     conversation_id: conversationId,
-    content: text,
-    message_type: options?.attachments && options.attachments.length > 0 ? 'media' : 'text',
+    message_type: messageType,
     reply_to_id: options?.replyTo, // Backend expects reply_to_id
     attachments: options?.attachments,
-  });
+  };
+
+  // Only include content if there's actual text content
+  if (text.trim()) {
+    requestData.content = text;
+  }
+
+  const { data } = await http().post(`/conversations/${conversationId}/messages`, requestData);
   return data.message || data;
 }
 
@@ -189,19 +278,36 @@ export async function sendMessageWithFiles(
   files: File[],
   options?: {
     replyTo?: string;
+    onProgress?: (fileIndex: number, progress: number) => void;
+    onFileComplete?: (fileIndex: number, result: unknown) => void;
   }
 ): Promise<Message> {
-  // First upload the files
-  const uploadResult = await uploadChatMedia(conversationId, files);
+  // First upload the files with progress tracking
+  const uploadResult = await uploadChatMediaWithProgress(conversationId, files, {
+    onProgress: options?.onProgress,
+    onFileComplete: options?.onFileComplete,
+  });
   
-  // Transform uploaded files to attachments format
+  // Transform uploaded files to attachments format matching backend MessageAttachment interface
   const attachments = uploadResult.files.map(file => ({
     id: file.id,
-    url: file.url,
-    type: file.type,
-    name: file.originalName,
+    fileName: file.fileName,
+    originalName: file.originalName,
+    mimeType: file.mimeType,
     size: file.size,
+    url: file.url,
+    key: file.id, // Use file id as key
+    fileType: determineFileType(file.mimeType),
+    isImage: file.mimeType.startsWith('image/'),
+    isVideo: file.mimeType.startsWith('video/'),
+    isAudio: file.mimeType.startsWith('audio/'),
+    isDocument: isDocumentType(file.mimeType),
+    sizeFormatted: formatFileSize(file.size),
+    uploadedBy: '', // Will be set by backend
+    uploadedAt: new Date().toISOString(),
   }));
+
+  console.log('[API] Convo upload Attachments:', attachments);
 
   // Then send the message with attachments
   return sendMessage(conversationId, text, {

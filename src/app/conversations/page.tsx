@@ -18,6 +18,7 @@ import { NewConversationDialog } from "@/components/conversations/NewConversatio
 import { TypingIndicator } from "@/domains/chat/components/TypingIndicator";
 import { EmojiPickerComponent } from "@/domains/chat/components/EmojiPicker";
 import { FileUploadModal } from "@/domains/chat/components/FileUploadModal";
+import { OptimisticMessage } from "@/domains/chat/components/OptimisticMessage";
 import { AnimatePresence, motion } from "framer-motion";
 
 function ChatsPageContent() {
@@ -389,6 +390,7 @@ function ChatsPageContent() {
 
 // Conversation Detail Component
 function ConversationDetail({ conversationId }: { conversationId: string }) {
+  const { toast } = useToast();
   const { items, isLoading, error, hasMore, loadMore } = useConversationMessages(conversationId);
   const { data: conversations } = useConversations();
   const conversation = conversations?.find(c => c.id === conversationId);
@@ -402,6 +404,12 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   const [showFileUploadOptions, setShowFileUploadOptions] = useState(false);
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<Array<{
+    id: string;
+    files: File[];
+    text?: string;
+    timestamp: string;
+  }>>([]);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const { mutateAsync: sendWithFiles, isPending: isUploadingFiles } = useSendMessageWithFiles(conversationId);
   const toggleReactionMutation = useToggleReaction(conversationId);
@@ -523,14 +531,61 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     inputRef.current?.focus();
   }
 
-  const handleFileUpload = async (files: File[]) => {
-    await sendWithFiles({
-      text: text.trim(),
+  const handleOptimisticMessage = (files: File[], messageText?: string) => {
+    const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
+    const newOptimisticMessage = {
+      id: optimisticId,
       files,
-      replyTo: replyTo?.id,
-    });
+      text: messageText || text.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    
+    setOptimisticMessages(prev => [...prev, newOptimisticMessage]);
     setText("");
     setReplyTo(null);
+    
+    // Remove optimistic message after successful upload (or error)
+    // This will be handled by the actual message arrival via real-time
+    setTimeout(() => {
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+    }, 10000); // Remove after 10 seconds as fallback
+  };
+
+  const handleFileUpload = async (files: File[]) => {
+    try {
+      await sendWithFiles({
+        text: text.trim(),
+        files,
+        replyTo: replyTo?.id,
+        // Progress tracking is now handled by the optimistic UI
+        // The real upload progress will be shown in the optimistic message
+      });
+      // Note: optimistic message cleanup happens in handleOptimisticMessage timeout
+    } catch (error: unknown) {
+      console.error('Failed to send message with files:', error);
+      
+      // Show detailed error message
+      let errorMessage = "Failed to send message with files. Please try again.";
+      
+      const err = error as { response?: { data?: { details?: unknown; message?: string } }; message?: string };
+      if (err?.response?.data?.details) {
+        // Handle validation errors from backend
+        const details = err.response.data.details;
+        if (Array.isArray(details)) {
+          errorMessage = details.map((d: { message?: string }) => d.message || 'Unknown error').join(', ');
+        }
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Failed to send message",
+        description: errorMessage,
+      });
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -593,6 +648,22 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                 me={me}
                 onReply={setReplyTo}
                 onReact={handleReact}
+                conversationType={conversation?.type}
+              />
+            ))}
+            
+            {/* Optimistic messages */}
+            {optimisticMessages.map((optimisticMsg) => (
+              <OptimisticMessage
+                key={optimisticMsg.id}
+                text={optimisticMsg.text}
+                files={optimisticMsg.files}
+                sender={{
+                  id: me || '',
+                  first_name: profile?.first_name || 'You',
+                  last_name: profile?.last_name || '',
+                  avatar_url: profile?.avatar_url || undefined,
+                }}
                 conversationType={conversation?.type}
               />
             ))}
@@ -808,12 +879,14 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         onClose={() => setShowFileUploadModal(false)}
         onUpload={handleFileUpload}
         conversationId={conversationId}
+        onOptimisticMessage={handleOptimisticMessage}
       />
     </div>
   );
 }
 
 // Import required hooks
+import { useToast } from "@/components/ui/use-toast";
 import { useConversationMessages, useSendMessage, useMarkConversationAsRead, useToggleReaction, useSendMessageWithFiles } from "@/domains/chat/hooks";
 import { useProfile } from "@/domains/auth/hooks";
 import { MessageItem } from "@/domains/chat/components/MessageItem";

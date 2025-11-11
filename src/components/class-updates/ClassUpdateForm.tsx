@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,15 +13,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Upload, FileText, Image as ImageIcon, Video, File, Loader2 } from "lucide-react";
-import { uploadAttachments } from "@/domains/class-updates/api";
 import { Badge } from "@/components/ui/badge";
 import type { AttachmentData } from "@/shared/types/attachment";
 import { 
   getAttachmentDisplayName, 
   getAttachmentMimeType, 
-  getAttachmentSizeFormatted,
-  formatFileSize
+  getAttachmentSizeFormatted
 } from "@/shared/types/attachment";
+import { UploadProgress, useUploadProgress } from "@/components/ui/upload-progress";
+import { uploadAttachmentsWithProgress } from "@/shared/utils/upload-with-progress";
 
 const UPDATE_TYPES = [
   { value: 'announcement', label: 'Announcement', color: 'bg-blue-100 text-blue-700' },
@@ -89,8 +89,15 @@ export function ClassUpdateForm({
   isUploading,
   onUploadingChange,
 }: ClassUpdateFormProps) {
-  const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    files: uploadFiles,
+    addFiles,
+    updateFileProgress,
+    updateFileStatus,
+    removeFile: removeUploadFile,
+    clearFiles,
+  } = useUploadProgress();
 
   // Track initialization to prevent loops
   const initializedRef = useRef<string | null>(null);
@@ -114,7 +121,7 @@ export function ClassUpdateForm({
         existingAttachments: initialAttachments,
         uploadedAttachments: [],
       });
-      setFiles([]);
+      clearFiles();
       onErrorsChange({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +135,7 @@ export function ClassUpdateForm({
     const totalAttachments = 
       formData.existingAttachments.length + 
       formData.uploadedAttachments.length + 
-      files.length;
+      uploadFiles.length;
 
     selectedFiles.forEach((file) => {
       if (totalAttachments + validFiles.length >= MAX_FILES) {
@@ -143,7 +150,7 @@ export function ClassUpdateForm({
     });
 
     if (validFiles.length > 0) {
-      setFiles((prev) => [...prev, ...validFiles]);
+      addFiles(validFiles);
     }
     onErrorsChange(newErrors);
     
@@ -153,9 +160,7 @@ export function ClassUpdateForm({
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  // handleRemoveFile is now handled by removeUploadFile from useUploadProgress
 
   const handleRemoveExistingAttachment = (index: number) => {
     onFormDataChange({
@@ -169,18 +174,43 @@ export function ClassUpdateForm({
       return;
     }
 
-    if (files.length === 0) return;
+    if (uploadFiles.length === 0) return;
 
     onUploadingChange(true);
     try {
-      const attachments = await uploadAttachments(formData.classId, files);
+      // Mark all files as uploading
+      uploadFiles.forEach(file => {
+        updateFileStatus(file.id, 'uploading');
+      });
+
+      const fileObjects = uploadFiles.map(f => f.file);
+      
+      const attachments = await uploadAttachmentsWithProgress(formData.classId, fileObjects, {
+        onProgress: (fileIndex, progress) => {
+          if (uploadFiles[fileIndex]) {
+            updateFileProgress(uploadFiles[fileIndex].id, progress);
+          }
+        },
+        onFileComplete: (fileIndex) => {
+          if (uploadFiles[fileIndex]) {
+            updateFileStatus(uploadFiles[fileIndex].id, 'completed');
+          }
+        },
+      });
+
       onFormDataChange({
         uploadedAttachments: [...formData.uploadedAttachments, ...attachments as AttachmentData[]],
       });
-      setFiles([]);
+      clearFiles();
       onErrorsChange({});
     } catch (error: unknown) {
       console.error('Failed to upload files:', error);
+      
+      // Mark all files as error
+      uploadFiles.forEach(file => {
+        updateFileStatus(file.id, 'error', 'Upload failed');
+      });
+      
       const err = error as { message?: string; response?: { data?: { message?: string }; status?: number }; code?: string };
       const errorDetails = {
         message: err?.message,
@@ -367,17 +397,17 @@ export function ClassUpdateForm({
           {errors.files && <p className="text-xs text-red-500">{errors.files}</p>}
 
           {/* Selected Files (Not Uploaded Yet) */}
-          {files.length > 0 && (
+          {uploadFiles.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Files to upload ({files.length})</p>
+                <p className="text-sm font-medium">Files to upload ({uploadFiles.length})</p>
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleUploadFiles}
-                  disabled={isUploading || !formData.classId}
+                  disabled={isUploading || !formData.classId || uploadFiles.some(f => f.status === 'uploading')}
                 >
-                  {isUploading ? (
+                  {isUploading || uploadFiles.some(f => f.status === 'uploading') ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Uploading...
@@ -387,26 +417,13 @@ export function ClassUpdateForm({
                   )}
                 </Button>
               </div>
-              <div className="space-y-2">
-                {files.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    {getFileIcon(file.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveFile(index)}
-                      disabled={isUploading}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              <UploadProgress
+                files={uploadFiles}
+                onFilesChange={() => {}} // Handled by useUploadProgress
+                onRemoveFile={removeUploadFile}
+                showPreviews={true}
+                compact={true}
+              />
             </div>
           )}
 

@@ -67,10 +67,16 @@ function transformMessage(backendMessage: BackendMessage): Message {
     };
   }
 
-  const messageContent = backendMessage.content ?? backendMessage.text ?? undefined;
+  // Handle null content explicitly - backend returns null when there's no text
+  const messageContent = backendMessage.content !== null && backendMessage.content !== undefined
+    ? backendMessage.content
+    : backendMessage.text !== null && backendMessage.text !== undefined
+    ? backendMessage.text
+    : undefined;
   
   // Extract attachments from metadata if they exist
   let attachments = backendMessage.attachments ?? [];
+  
   if (backendMessage.metadata && typeof backendMessage.metadata === 'object') {
     const metadataAttachments = (backendMessage.metadata as Record<string, unknown>).attachments;
     if (Array.isArray(metadataAttachments)) {

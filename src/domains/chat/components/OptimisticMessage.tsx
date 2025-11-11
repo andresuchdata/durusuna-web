@@ -1,0 +1,175 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MediaGridWithLoading } from "@/components/media/MediaTileWithLoading";
+import { FileAttachment } from "./FileAttachment";
+import { Loader2 } from "lucide-react";
+
+export interface OptimisticMessageProps {
+  text?: string;
+  files: File[];
+  sender: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    avatar_url?: string;
+  };
+  conversationType?: "direct" | "group";
+  uploadProgress?: Record<string, number>; // fileId -> progress percentage
+}
+
+export function OptimisticMessage({ 
+  text, 
+  files, 
+  sender, 
+  conversationType = "group",
+  uploadProgress = {}
+}: OptimisticMessageProps) {
+  const hasText = text && text.trim().length > 0;
+  
+  // Convert files to media items with loading state
+  const mediaItems = files
+    .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
+    .map(file => ({
+      id: file.name + file.size, // Simple ID
+      name: file.name,
+      url: URL.createObjectURL(file), // Create preview URL
+      type: file.type,
+      size: file.size,
+      isLoading: true, // Always loading for optimistic messages
+    }));
+
+  // Convert files to file attachments
+  const fileAttachments = files
+    .filter(file => !file.type.startsWith('image/') && !file.type.startsWith('video/'))
+    .map(file => ({
+      id: file.name + file.size,
+      fileName: file.name,
+      originalName: file.name,
+      mimeType: file.type,
+      size: file.size,
+      url: '', // No URL for non-media files
+      key: file.name,
+      fileType: getFileType(file.type),
+      isImage: false,
+      isVideo: false,
+      isAudio: file.type.startsWith('audio/'),
+      isDocument: isDocumentType(file.type),
+      sizeFormatted: formatFileSize(file.size),
+      uploadedBy: sender.id,
+      uploadedAt: new Date().toISOString(),
+    }));
+
+  function getFileType(mimeType: string): 'image' | 'video' | 'audio' | 'document' | 'other' {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (isDocumentType(mimeType)) return 'document';
+    return 'other';
+  }
+
+  function isDocumentType(mimeType: string): boolean {
+    return mimeType.includes('pdf') || 
+           mimeType.includes('document') || 
+           mimeType.includes('spreadsheet') || 
+           mimeType.includes('text/') ||
+           mimeType.includes('application/');
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 0.7, y: 0 }} // Slightly transparent to show it's optimistic
+      className="flex items-start gap-3 px-4 py-2"
+    >
+      {/* Avatar - only show in group conversations */}
+      {conversationType === "group" && (
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarImage src={sender.avatar_url} />
+          <AvatarFallback className="text-xs">
+            {sender.first_name?.[0]}{sender.last_name?.[0]}
+          </AvatarFallback>
+        </Avatar>
+      )}
+
+      <div className="flex-1 min-w-0">
+        {/* Sender name - only show in group conversations */}
+        {conversationType === "group" && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium text-emerald-600">
+              {sender.first_name} {sender.last_name}
+            </span>
+          </div>
+        )}
+
+        {/* Message bubble */}
+        <div className={`relative w-fit min-w-[80px] ${
+          hasText && text.length > 50 
+            ? 'max-w-[85%]' 
+            : hasText && text.length > 20
+              ? 'max-w-[80%]' 
+              : mediaItems.length > 0 || fileAttachments.length > 0
+                ? 'max-w-[70%]'
+                : 'max-w-[70%]'
+        }`}>
+          <div
+            className={`
+              message-bubble rounded-2xl shadow-sm w-full overflow-hidden 
+              transition-all duration-200 bg-emerald-500 text-white
+              ${hasText ? 'px-4 py-2' : mediaItems.length > 0 || fileAttachments.length > 0 ? 'p-2' : 'px-4 py-2'}
+            `}
+          >
+            {/* Media attachments */}
+            {mediaItems.length > 0 && (
+              <div className={hasText ? "mb-2" : ""}>
+                <MediaGridWithLoading
+                  items={mediaItems}
+                  onItemClick={() => {}} // No action for optimistic messages
+                />
+              </div>
+            )}
+
+            {/* File attachments */}
+            {fileAttachments.length > 0 && (
+              <div className={`space-y-2 ${hasText ? "mb-2" : ""}`}>
+                {fileAttachments.map((attachment) => (
+                  <div key={attachment.id} className="relative">
+                    <FileAttachment attachment={attachment} />
+                    {/* Loading overlay for file attachments */}
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded">
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Text content */}
+            {hasText && (
+              <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere select-none touch-manipulation">
+                {text}
+              </p>
+            )}
+
+            {/* Timestamp and status */}
+            <div className={`flex items-center justify-end gap-1 flex-shrink-0 select-none ${hasText || mediaItems.length > 0 || fileAttachments.length > 0 ? "mt-1" : ""}`}>
+              <Loader2 className="h-3 w-3 animate-spin opacity-70" />
+              <span className="text-[10px] opacity-70 whitespace-nowrap select-none touch-manipulation">
+                Sending...
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

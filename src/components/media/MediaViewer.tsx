@@ -326,24 +326,30 @@ interface MediaThumbnailGridProps {
 export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridProps) {
   if (items.length === 0) return null;
 
-  if (items.length === 1) {
-    const item = items[0];
+  // Limit to maximum 7 items
+  const displayItems = items.slice(0, 7);
+  const totalItems = displayItems.length;
+  const remainingCount = totalItems > 4 ? totalItems - 4 : 0;
+
+  // Single item: full width display - MUCH BIGGER for better preview
+  if (totalItems === 1) {
+    const item = displayItems[0];
     return (
       <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onClick={() => onItemClick(0)}>
         {item.type?.startsWith('image/') ? (
-          <div className="relative w-full h-auto max-h-96">
+          <div className="relative w-full h-auto max-h-[500px]">
             <Image
               src={item.url}
               alt={item.name}
               width={800}
               height={600}
-              className="w-full h-auto max-h-96 object-cover"
+              className="w-full h-auto max-h-[500px] object-cover"
               unoptimized
             />
           </div>
         ) : item.type?.startsWith('video/') ? (
           <div className="relative">
-            <video src={item.url} className="w-full h-auto max-h-96 object-cover" />
+            <video src={item.url} className="w-full h-auto max-h-[500px] object-cover" />
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
               <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
                 <svg className="h-8 w-8 text-gray-900 ml-1" fill="currentColor" viewBox="0 0 20 20">
@@ -366,13 +372,24 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
     );
   }
 
+  // Determine grid layout based on item count
+  const getGridClass = () => {
+    if (totalItems === 2) return 'grid-cols-2';
+    if (totalItems === 3) return 'grid-cols-3';
+    // For 4+ items, always use 2x2 grid showing max 4 tiles
+    return 'grid-cols-2';
+  };
+
+  // Show maximum 4 tiles, with overlay on 4th if there are more
+  const tilesToShow = Math.min(totalItems, 4);
+
   return (
-    <div className={`grid gap-1 ${items.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-      {items.slice(0, 3).map((item, index) => (
+    <div className={`grid gap-2 ${getGridClass()}`}>
+      {displayItems.slice(0, tilesToShow).map((item, index) => (
         <div
           key={item.id}
           onClick={() => onItemClick(index)}
-          className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
+          className="relative aspect-square cursor-pointer hover:opacity-90 transition-opacity overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800 min-h-[200px]"
         >
           {item.type?.startsWith('image/') ? (
             <div className="relative w-full h-full">
@@ -401,9 +418,10 @@ export function MediaThumbnailGrid({ items, onItemClick }: MediaThumbnailGridPro
             </div>
           )}
           
-          {index === 2 && items.length > 3 && (
+          {/* Show overlay on 4th tile if there are more than 4 items */}
+          {index === 3 && remainingCount > 0 && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">+{items.length - 3}</span>
+              <span className="text-white text-2xl font-bold">+{remainingCount}</span>
             </div>
           )}
         </div>

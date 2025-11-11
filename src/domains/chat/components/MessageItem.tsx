@@ -93,7 +93,9 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   
   const senderId = m.sender_id || m.senderId || m.sender?.id;
   const isMine = senderId === me;
-  const messageText = m.text || m.content || '';
+  // Handle null content explicitly - backend returns null when there's no text
+  const messageText = (m.text ?? m.content ?? '') || '';
+  const hasText = messageText.trim().length > 0;
   const timestamp = m.created_at || m.createdAt || new Date().toISOString();
   
   const senderName = m.sender 
@@ -108,6 +110,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
   const attachments = m.attachments || [];
   const mediaItems: MediaItem[] = [];
   const fileAttachments: typeof attachments = [];
+
 
   attachments.forEach((att) => {
     const type = att.mimeType || att.type || 'file';
@@ -313,18 +316,20 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
 
         {/* Message bubble */}
         <div className={`relative w-fit min-w-[80px] ${
-          messageText && messageText.length > 50 
+          hasText && messageText.length > 50 
             ? 'max-w-[85%]' 
-            : messageText && messageText.length > 20
+            : hasText && messageText.length > 20
               ? 'max-w-[80%]' 
-              : 'max-w-[70%]'
+              : mediaItems.length > 0 || fileAttachments.length > 0
+                ? 'max-w-full' // Use full width for media on mobile, same as text bubbles
+                : 'max-w-[70%]'
         }`}>
           {/* Main message */}
           <div
             className={`
               message-bubble rounded-2xl shadow-sm w-full overflow-hidden 
               transition-all duration-200
-              ${messageText ? 'px-4 py-2' : mediaItems.length > 0 ? 'p-2' : 'px-4 py-2'}
+              ${hasText ? 'px-4 py-2' : mediaItems.length > 0 || fileAttachments.length > 0 ? 'p-2' : 'px-4 py-2'}
               ${
                 // Base colors
                 isMine
@@ -390,7 +395,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
             )}
             {/* Media attachments */}
             {mediaItems.length > 0 && (
-              <div className="mb-2">
+              <div className={hasText ? "mb-2" : ""}>
                 <MediaThumbnailGrid
                   items={mediaItems}
                   onItemClick={(index) => {
@@ -403,7 +408,7 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
 
             {/* File attachments */}
             {fileAttachments.length > 0 && (
-              <div className="space-y-2 mb-2">
+              <div className={`space-y-2 ${hasText ? "mb-2" : ""}`}>
                 {fileAttachments.map((attachment) => (
                   <FileAttachment
                     key={attachment.id}
@@ -413,11 +418,12 @@ export function MessageItem({ m, me, onReply, onDelete, onReact, onForward, onAv
               </div>
             )}
 
-            {messageText && (
+            {hasText && (
               <p className="text-sm break-words whitespace-pre-wrap overflow-wrap-anywhere select-none touch-manipulation">{messageText}</p>
             )}
             
-            <div className="flex items-center justify-end gap-1 mt-1 flex-shrink-0 select-none">
+            {/* Timestamp and status - only show margin-top if there's content above */}
+            <div className={`flex items-center justify-end gap-1 flex-shrink-0 select-none ${hasText || mediaItems.length > 0 || fileAttachments.length > 0 ? "mt-1" : ""}`}>
               <span className="text-[10px] text-muted-foreground whitespace-nowrap select-none touch-manipulation">
                 {new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </span>

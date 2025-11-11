@@ -448,5 +448,11 @@ export function useSendMessageWithFiles(conversationId: string) {
         }
       );
     },
+    
+    onError: (error: any) => {
+      console.error('Failed to send message with files:', error);
+      // The error handling will be done in the conversation page component
+      // where useToast is available
+    },
   });
 }

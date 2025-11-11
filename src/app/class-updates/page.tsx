@@ -155,8 +155,8 @@ export default function ClassUpdatesPage() {
   }), [activeFilters, debouncedSearch]);
 
   const { data, isLoading, error, refetch } = useClassUpdates(queryFilters);
-  const { data: classes } = useClasses();
-  const { data: teachers } = useTeachers();
+  const { data: classes, isLoading: isLoadingClasses } = useClasses();
+  const { data: teachers, isLoading: isLoadingTeachers } = useTeachers();
 
   const hasActiveFilters = Object.keys(activeFilters).length > 0 || searchQuery.length > 0;
 
@@ -224,37 +224,45 @@ export default function ClassUpdatesPage() {
             <span className="text-xs text-muted-foreground font-medium">Filters:</span>
             
             {/* Class Filter */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs bg-white border-gray-200 hover:bg-gray-50">
-                  <Filter className="h-3 w-3 mr-1" />
-                  {filters.class_id ? classes?.find(c => c.id === filters.class_id)?.name : 'Class'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 bg-white">
-                <DropdownMenuLabel className="text-xs">Filter by Class</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => applyFilter('class_id', undefined)} className="text-xs">
-                  All Classes
-                </DropdownMenuItem>
-                {classes?.map((cls) => (
-                  <DropdownMenuItem
-                    key={cls.id}
-                    onClick={() => applyFilter('class_id', cls.id)}
-                    className="text-xs"
-                  >
-                    {cls.name}
+            {isLoadingClasses ? (
+              <Skeleton className="h-7 w-16 rounded-md" />
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs bg-white border-gray-200 hover:bg-gray-50">
+                    <Filter className="h-3 w-3 mr-1" />
+                    {filters.class_id ? classes?.find(c => c.id === filters.class_id)?.name : 'Class'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52 bg-white">
+                  <DropdownMenuLabel className="text-xs">Filter by Class</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => applyFilter('class_id', undefined)} className="text-xs">
+                    All Classes
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {classes?.map((cls) => (
+                    <DropdownMenuItem
+                      key={cls.id}
+                      onClick={() => applyFilter('class_id', cls.id)}
+                      className="text-xs"
+                    >
+                      {cls.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Teacher Filter with Search */}
-            <TeacherFilterDropdown 
-              teachers={teachers}
-              selectedTeacherId={filters.author_id}
-              onSelect={(teacherId) => applyFilter('author_id', teacherId)}
-            />
+            {isLoadingTeachers ? (
+              <Skeleton className="h-7 w-20 rounded-md" />
+            ) : (
+              <TeacherFilterDropdown 
+                teachers={teachers}
+                selectedTeacherId={filters.author_id}
+                onSelect={(teacherId) => applyFilter('author_id', teacherId)}
+              />
+            )}
 
             {/* Type Filter */}
             <DropdownMenu>
@@ -294,28 +302,91 @@ export default function ClassUpdatesPage() {
 
         {isLoading ? (
           <div className="space-y-4">
+            {/* Filter Bar Skeleton */}
+            <div className="mb-4 space-y-2">
+              {/* Search Input Skeleton */}
+              <div className="relative">
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+              
+              {/* Filter Dropdowns Skeleton */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Skeleton className="h-4 w-12" /> {/* "Filters:" text */}
+                <Skeleton className="h-7 w-16 rounded-md" /> {/* Class filter */}
+                <Skeleton className="h-7 w-20 rounded-md" /> {/* Teacher filter */}
+                <Skeleton className="h-7 w-14 rounded-md" /> {/* Type filter */}
+              </div>
+            </div>
+
+            {/* Class Update Cards Skeleton */}
             {Array.from({ length: 5 }).map((_, i) => (
               <Card key={i} className="overflow-hidden">
                 <CardContent className="p-0">
+                  {/* Header Section */}
                   <div className="p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Skeleton className="h-12 w-12 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-24" />
+                    <div className="flex items-start gap-3 mb-4">
+                      <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex-1 space-y-1">
+                            <Skeleton className="h-4 w-32" /> {/* Author name */}
+                            <Skeleton className="h-3 w-20" /> {/* Date */}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-5 w-16 rounded-full" /> {/* Badge */}
+                            <Skeleton className="h-8 w-8 rounded" /> {/* Menu button */}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <Skeleton className="h-6 w-3/4 mb-3" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-2/3" />
+
+                    {/* Title and Class Badge */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <Skeleton className="h-6 w-48" /> {/* Title */}
+                      <Skeleton className="h-5 w-20 rounded-full" /> {/* Class badge */}
+                    </div>
+
+                    {/* Content */}
+                    <div className="space-y-2 mb-4">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
                   </div>
-                  <Skeleton className="h-64 w-full" />
-                  <div className="p-4">
-                    <div className="flex gap-6">
-                      <Skeleton className="h-8 w-16" />
-                      <Skeleton className="h-8 w-16" />
-                      <Skeleton className="h-8 w-16" />
+
+                  {/* Media Preview Skeleton */}
+                  {i % 3 === 0 && ( // Show media skeleton for some cards
+                    <div className="px-4 pb-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Skeleton className="h-32 w-full rounded-md" />
+                        <Skeleton className="h-32 w-full rounded-md" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions Section */}
+                  <div className="p-4 border-t border-border">
+                    {/* Reactions Skeleton */}
+                    {i % 2 === 0 && ( // Show reactions skeleton for some cards
+                      <div className="flex items-center gap-2 mb-3">
+                        <Skeleton className="h-6 w-12 rounded-full" />
+                        <Skeleton className="h-6 w-10 rounded-full" />
+                        <Skeleton className="h-6 w-14 rounded-full" />
+                      </div>
+                    )}
+
+                    {/* Comment Count Skeleton */}
+                    <div className="mb-3">
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1 md:gap-2">
+                      <Skeleton className="h-8 flex-1 rounded-md" /> {/* React */}
+                      <Skeleton className="h-8 flex-1 rounded-md" /> {/* Comment */}
+                      <Skeleton className="h-8 flex-1 rounded-md" /> {/* Share */}
+                      <Skeleton className="h-8 flex-1 rounded-md" /> {/* Save */}
                     </div>
                   </div>
                 </CardContent>
