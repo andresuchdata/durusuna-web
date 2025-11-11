@@ -1,6 +1,6 @@
 import { http } from "@/core/http/axios";
 import type { Conversation, Message } from "./types";
-import { uploadChatMediaWithProgress } from "@/shared/utils/upload-with-progress";
+import { uploadChatMediaWithProgress, uploadConversationMediaWithProgress } from "@/shared/utils/upload-with-progress";
 
 export type Paginated<T> = {
   items: T[];
@@ -282,10 +282,18 @@ export async function sendMessageWithFiles(
     onFileComplete?: (fileIndex: number, result: unknown) => void;
   }
 ): Promise<Message> {
-  // First upload the files with progress tracking
-  const uploadResult = await uploadChatMediaWithProgress(conversationId, files, {
+  // FAST UPLOAD: Use presigned URLs for direct S3/R2 upload (like class updates)
+  // This replaces the slow FormData multipart upload that took 11+ seconds
+  const uploadStartTime = Date.now();
+  const uploadResult = await uploadConversationMediaWithProgress(conversationId, files, {
     onProgress: options?.onProgress,
     onFileComplete: options?.onFileComplete,
+  });
+  
+  const uploadTime = Date.now() - uploadStartTime;
+  console.log(`[API] ⚡ FAST upload completed in ${uploadTime}ms!`, { 
+    filesUploaded: uploadResult.files.length,
+    averageTimePerFile: Math.round(uploadTime / files.length)
   });
   
   // Transform uploaded files to attachments format matching backend MessageAttachment interface
@@ -306,8 +314,6 @@ export async function sendMessageWithFiles(
     uploadedBy: '', // Will be set by backend
     uploadedAt: new Date().toISOString(),
   }));
-
-  console.log('[API] Convo upload Attachments:', attachments);
 
   // Then send the message with attachments
   return sendMessage(conversationId, text, {

@@ -82,10 +82,10 @@ export async function uploadAttachmentsWithProgress(
   files: File[],
   options: {
     onProgress?: (fileIndex: number, progress: number) => void;
-    onFileComplete?: (fileIndex: number, result: any) => void;
+    onFileComplete?: (fileIndex: number, result: UploadResult) => void;
     signal?: AbortSignal;
   } = {}
-): Promise<any[]> {
+): Promise<UploadResult[]> {
   const { onProgress, onFileComplete, signal } = options;
 
   // Step 1: Get presigned URLs from backend
@@ -119,7 +119,7 @@ export async function uploadAttachmentsWithProgress(
     }
 
     // Create XMLHttpRequest for progress tracking (fetch doesn't support progress)
-    return new Promise<any>((resolve, reject) => {
+    return new Promise<UploadResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
       // Handle abort signal
@@ -139,16 +139,14 @@ export async function uploadAttachmentsWithProgress(
 
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const result = {
+          const result: UploadResult = {
             id: urlInfo.id,
-            name: urlInfo.originalName,
             url: urlInfo.publicUrl,
-            type: urlInfo.mimeType,
-            size: urlInfo.size,
             fileName: urlInfo.fileName,
             originalName: urlInfo.originalName,
             mimeType: urlInfo.mimeType,
-            key: urlInfo.key,
+            size: urlInfo.size,
+            type: urlInfo.mimeType,
           };
 
           if (onFileComplete) {
@@ -177,6 +175,118 @@ export async function uploadAttachmentsWithProgress(
   
   const attachments = await Promise.all(uploadPromises);
   return attachments;
+}
+
+/**
+ * Upload conversation media files with progress tracking using presigned URLs (FAST METHOD)
+ */
+export async function uploadConversationMediaWithProgress(
+  conversationId: string,
+  files: File[],
+  options: {
+    onProgress?: (fileIndex: number, progress: number) => void;
+    onFileComplete?: (fileIndex: number, result: UploadResult) => void;
+    signal?: AbortSignal;
+  } = {}
+): Promise<{
+  success: boolean;
+  files: UploadResult[];
+}> {
+  const { onProgress, onFileComplete, signal } = options;
+
+  // Step 1: Get presigned URLs from backend
+  const filesInfo = files.map(f => ({
+    name: f.name,
+    type: f.type,
+    size: f.size
+  }));
+  
+  const { data: urlsData } = await http().post('/conversations/generate-presigned-urls', {
+    conversation_id: conversationId,
+    files: filesInfo,
+  });
+  
+  console.log(`Got ${urlsData.urls.length} presigned URLs for conversation media`);
+
+  // Step 2: Upload each file directly to S3/R2 using presigned URLs
+  const uploadPromises = urlsData.urls.map(async (urlInfo: {
+    id: string;
+    uploadUrl: string;
+    publicUrl: string;
+    key: string;
+    fileName: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  }, index: number) => {
+    const file = files[index];
+    
+    // Initialize progress
+    if (onProgress) {
+      onProgress(index, 0);
+    }
+
+    // Create XMLHttpRequest for progress tracking (fetch doesn't support progress)
+    return new Promise<UploadResult>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Handle abort signal
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          xhr.abort();
+          reject(new Error('Upload aborted'));
+        });
+      }
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable && onProgress) {
+          const progress = Math.round((event.loaded * 100) / event.total);
+          onProgress(index, progress);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const result: UploadResult = {
+            id: urlInfo.id,
+            url: urlInfo.publicUrl,
+            fileName: urlInfo.fileName,
+            originalName: urlInfo.originalName,
+            mimeType: urlInfo.mimeType,
+            size: urlInfo.size,
+            type: urlInfo.mimeType,
+          };
+
+          if (onFileComplete) {
+            onFileComplete(index, result);
+          }
+
+          resolve(result);
+        } else {
+          reject(new Error(`Failed to upload ${file.name}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error(`Failed to upload ${file.name}: Network error`));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error(`Upload of ${file.name} was aborted`));
+      });
+
+      xhr.open('PUT', urlInfo.uploadUrl);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.send(file);
+    });
+  });
+  
+  const uploadResults = await Promise.all(uploadPromises);
+  
+  return {
+    success: true,
+    files: uploadResults
+  };
 }
 
 /**

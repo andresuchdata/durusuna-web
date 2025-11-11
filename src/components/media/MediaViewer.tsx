@@ -5,7 +5,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { X, Download, ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, FileText, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface MediaItem {
   id: string;
@@ -95,6 +95,11 @@ export function MediaViewer({ items, initialIndex = 0, open, onOpenChange }: Med
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
+        <DialogHeader>
+          <DialogTitle className="sr-only">
+            {currentItem.name ? `Viewing ${currentItem.name}` : "Media viewer"}
+          </DialogTitle>
+        </DialogHeader>
         <div className="relative w-full h-[95vh] flex flex-col">
           {/* Header */}
           <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4">
