@@ -57,15 +57,36 @@ export function ConversationItem({
   // Handle both 'text' and 'content' fields for last message
   let last = c.last_message?.text || c.last_message?.content || "";
   
-  // If no text content but has attachments, show attachment description
+  // If no text content but has a message, try to generate attachment description
   if (!last && c.last_message) {
+    // First try to use actual attachments if available (backend now includes them)
     const attachmentDesc = generateAttachmentDescription(c.last_message);
-    last = attachmentDesc || "No messages yet";
+    
+    if (attachmentDesc) {
+      last = attachmentDesc;
+    } else if (c.last_message.message_type && c.last_message.message_type !== 'text') {
+      // Fallback to message type description if no attachments but has type
+      last = getMessageTypeDescription(c.last_message.message_type);
+    } else {
+      last = "No messages yet";
+    }
   }
   
   // Final fallback
   if (!last) {
     last = "No messages yet";
+  }
+  
+  // Helper function to get description from message type
+  function getMessageTypeDescription(messageType: string): string {
+    switch (messageType) {
+      case 'image': return 'Photo';
+      case 'video': return 'Video';
+      case 'audio': return 'Audio';
+      case 'file': return 'Document';
+      case 'emoji': return 'Emoji';
+      default: return 'Media';
+    }
   }
   const initials = title
     .split(" ")

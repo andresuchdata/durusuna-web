@@ -26,6 +26,9 @@ export type Conversation = {
     content?: string;
     sender_id: string;
     created_at: string;
+    message_type?: 'text' | 'image' | 'video' | 'audio' | 'file' | 'emoji';
+    is_from_me?: boolean;
+    attachments?: AttachmentData[];
   } | null;
   unread_count?: number;
   updated_at?: string;

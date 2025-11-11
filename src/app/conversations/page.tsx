@@ -8,7 +8,7 @@ import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile, Plus } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile, Plus, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -208,6 +208,15 @@ function ChatsPageContent() {
               <h1 className="text-xl font-semibold text-white">Chats</h1>
             </div>
             <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] })}
+                title="Refresh Conversations"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
