@@ -410,9 +410,8 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     files: File[];
     text?: string;
     timestamp: string;
-    uploadProgress?: Record<string, number>; // fileId -> progress percentage
+    uploadProgress: Record<string, number>; // fileId -> progress percentage
   }>>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, Record<string, number>>>({});  // optimisticId -> (fileId -> progress)
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const { mutateAsync: sendWithFiles, isPending: isUploadingFiles } = useSendMessageWithFiles(conversationId);
   const toggleReactionMutation = useToggleReaction(conversationId);
@@ -536,12 +535,20 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 
   const handleOptimisticMessage = (files: File[], messageText?: string, customOptimisticId?: string) => {
     const optimisticId = customOptimisticId || `optimistic-${Date.now()}-${Math.random()}`;
+    
+    // Initialize progress for all files
+    const initialProgress: Record<string, number> = {};
+    files.forEach(file => {
+      const fileId = file.name + file.size;
+      initialProgress[fileId] = 0;
+    });
+    
     const newOptimisticMessage = {
       id: optimisticId,
       files,
       text: messageText || text.trim(),
       timestamp: new Date().toISOString(),
-      uploadProgress: {},
+      uploadProgress: initialProgress,
     };
     
     setOptimisticMessages(prev => [...prev, newOptimisticMessage]);
@@ -564,14 +571,6 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
       // Create optimistic message with initial progress
       handleOptimisticMessage(files, undefined, optimisticId);
       
-      // Initialize progress tracking for this optimistic message
-      const initialProgress: Record<string, number> = {};
-      files.forEach(file => {
-        const fileId = file.name + file.size;
-        initialProgress[fileId] = 0;
-      });
-      setUploadProgress(prev => ({ ...prev, [optimisticId]: initialProgress }));
-      
       await sendWithFiles({
         text: text.trim(),
         files,
@@ -579,15 +578,8 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         onProgress: (fileIndex: number, progress: number) => {
           if (files[fileIndex]) {
             const fileId = files[fileIndex].name + files[fileIndex].size;
-            setUploadProgress(prev => ({
-              ...prev,
-              [optimisticId]: {
-                ...prev[optimisticId],
-                [fileId]: progress
-              }
-            }));
             
-            // Update optimistic message with progress
+            // Update optimistic message with progress (single source of truth)
             setOptimisticMessages(prevMessages => 
               prevMessages.map(msg => 
                 msg.id === optimisticId 
@@ -600,35 +592,24 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         onFileComplete: (fileIndex: number) => {
           if (files[fileIndex]) {
             const fileId = files[fileIndex].name + files[fileIndex].size;
-            setUploadProgress(prev => ({
-              ...prev,
-              [optimisticId]: {
-                ...prev[optimisticId],
-                [fileId]: 100
-              }
-            }));
+            
+            // Mark file as complete (100%) in optimistic message
+            setOptimisticMessages(prevMessages => 
+              prevMessages.map(msg => 
+                msg.id === optimisticId 
+                  ? { ...msg, uploadProgress: { ...msg.uploadProgress, [fileId]: 100 } }
+                  : msg
+              )
+            );
           }
         }
       });
       
-      // Clean up progress tracking after successful upload
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[optimisticId];
-          return newProgress;
-        });
-      }, 1000);
-      
     } catch (error: unknown) {
       console.error('Failed to send message with files:', error);
       
-      // Clean up progress tracking on error
-      setUploadProgress(prev => {
-        const newProgress = { ...prev };
-        delete newProgress[optimisticId];
-        return newProgress;
-      });
+      // Remove the optimistic message on error since upload failed
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
       
       // Show detailed error message
       let errorMessage = "Failed to send message with files. Please try again.";
@@ -731,7 +712,7 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
                   avatar_url: profile?.avatar_url || undefined,
                 }}
                 conversationType={conversation?.type}
-                uploadProgress={uploadProgress[optimisticMsg.id] || optimisticMsg.uploadProgress || {}}
+                uploadProgress={optimisticMsg.uploadProgress}
               />
             ))}
             
@@ -941,7 +922,6 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         }}
         onUpload={handleFileUpload}
         conversationId={conversationId}
-        onOptimisticMessage={handleOptimisticMessage}
         fileType={fileUploadType}
       />
     </div>

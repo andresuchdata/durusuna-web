@@ -84,7 +84,7 @@ const getFileTypeDescription = (fileType: 'image' | 'video' | 'audio' | 'documen
 
 // Removed getFileType function - no longer needed
 
-export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage, fileType }: FileUploadModalProps) {
+export function FileUploadModal({ open, onClose, onUpload, fileType }: FileUploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -167,17 +167,15 @@ export function FileUploadModal({ open, onClose, onUpload, onOptimisticMessage, 
     try {
       const fileObjects = files.map(f => f.file);
       
-      // Create optimistic message immediately with file objects
-      if (onOptimisticMessage) {
-        onOptimisticMessage(fileObjects);
-      }
+      // DON'T create optimistic message here - let the upload handler do it
+      // This prevents duplicate optimistic messages from appearing
+      // The handleFileUpload function will create the optimistic message with proper progress tracking
       
       // Close modal immediately for better UX
       clearFiles();
       onClose();
       
-      // Call the onUpload callback which handles the actual upload
-      // This prevents duplicate uploads since onUpload (sendWithFiles) already handles progress
+      // Call the onUpload callback which handles the actual upload AND optimistic message creation
       await onUpload(fileObjects);
       
     } catch (error: unknown) {
