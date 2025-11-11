@@ -236,7 +236,23 @@ export function useSendMessage(conversationId: string) {
     mutationFn: (payload: { 
       text: string; 
       replyTo?: string;
-      attachments?: Array<{ id: string; url: string; type: string; name: string; size: number }>;
+      attachments?: Array<{
+        id: string;
+        fileName: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        url: string;
+        key: string;
+        fileType: 'image' | 'video' | 'audio' | 'document' | 'other';
+        isImage: boolean;
+        isVideo: boolean;
+        isAudio: boolean;
+        isDocument: boolean;
+        sizeFormatted: string;
+        uploadedBy: string;
+        uploadedAt: string;
+      }>;
     }) => sendMessage(conversationId, payload.text, {
       replyTo: payload.replyTo,
       attachments: payload.attachments,
@@ -419,9 +435,10 @@ export function useSendMessageWithFiles(conversationId: string) {
       // Add the new message to the cache
       queryClient.setQueryData(
         ["chat", "conversation", "messages", conversationId],
-        (old: any) => {
-          if (!old) return { items: [newMessage], nextCursor: null };
-          return { ...old, items: [newMessage, ...old.items] };
+        (old: unknown) => {
+          const oldData = old as { items: Message[]; nextCursor: string | null } | undefined;
+          if (!oldData) return { items: [newMessage], nextCursor: null };
+          return { ...oldData, items: [newMessage, ...oldData.items] };
         }
       );
 
@@ -449,7 +466,7 @@ export function useSendMessageWithFiles(conversationId: string) {
       );
     },
     
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to send message with files:', error);
       // The error handling will be done in the conversation page component
       // where useToast is available
