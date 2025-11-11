@@ -52,7 +52,7 @@ const ACCEPTED_TYPES = {
 };
 
 // Helper function to get allowed file types based on filter
-const getAllowedTypes = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null): string[] => {
+const getAllowedTypes = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null | undefined): string[] => {
   if (!fileType) {
     return Object.values(ACCEPTED_TYPES).flat();
   }
@@ -65,7 +65,7 @@ const getAllowedTypes = (fileType: 'image' | 'video' | 'audio' | 'document' | 'm
 };
 
 // Helper function to get file type description
-const getFileTypeDescription = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null): string => {
+const getFileTypeDescription = (fileType: 'image' | 'video' | 'audio' | 'document' | 'media' | null | undefined): string => {
   switch (fileType) {
     case 'image':
       return 'Images only';
