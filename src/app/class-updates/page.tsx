@@ -811,7 +811,7 @@ function ClassUpdateCard({ update, onUpdate }: { update: ClassUpdate; onUpdate?:
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="flex items-center gap-1 md:gap-2 mb-2">
             {/* TODO: Replace with Popover component when available */}
             <div className="relative flex-1">
               <Button 
