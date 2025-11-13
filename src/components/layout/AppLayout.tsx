@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/domains/auth/hooks";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, BookOpen, User, LogOut, Menu, X, Users, ClipboardCheck, FileText, GraduationCap, UserCog } from "lucide-react";
+import { MessageSquare, BookOpen, User, LogOut, Menu, X, Users, ClipboardCheck, FileText, GraduationCap, UserCog, LayoutDashboard } from "lucide-react";
 import { tokenStore } from "@/core/auth/token";
 import { useEffect, useState } from "react";
 import { TopHeader } from "./TopHeader";
@@ -58,15 +58,18 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
   const fullName = [firstName, lastName].filter(Boolean).join(" ") || profile.name || profile.email;
   const isAdmin = profile.role === "admin" || profile.user_type === "admin";
   const isTeacher = profile.user_type === "teacher";
+  const isParent = profile.user_type === "parent";
+  const isStudent = profile.user_type === "student";
 
   const navItems = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/class-updates", label: "Updates", icon: BookOpen },
-    { href: "/classes", label: "Classes", icon: Users },
-    { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
-    { href: "/assignments", label: "Assignments", icon: FileText },
-    { href: "/grades", label: "Grades", icon: GraduationCap },
-    ...(isAdmin || isTeacher ? [{ href: "/users", label: "Users", icon: UserCog }] : []),
+    ...((isTeacher || isAdmin || isParent || isStudent) ? [{ href: "/classes", label: "Classes", icon: Users }] : []),
+    ...(isTeacher ? [{ href: "/attendance", label: "Attendance", icon: ClipboardCheck }] : []),
+    ...((isTeacher || isStudent) ? [{ href: "/assignments", label: "Assignments", icon: FileText }] : []),
+    ...((isTeacher || isStudent) ? [{ href: "/grades", label: "Grades", icon: GraduationCap }] : []),
+    ...(isAdmin ? [{ href: "/users", label: "Users", icon: UserCog }] : []),
     { href: "/profile", label: "Profile", icon: User },
   ];
 
