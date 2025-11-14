@@ -41,3 +41,34 @@ export interface UpdateLessonRequest {
   notes?: string | null;
   cancellation_reason?: string | null;
 }
+
+export type LessonInstanceStatus = LessonInstance["status"];
+
+export interface AdminLessonSummary {
+  id: string;
+  title?: string | null;
+  subject_name?: string | null;
+  class_name?: string | null;
+  teacher_name?: string | null;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: LessonInstanceStatus;
+}
+
+export interface AdminLessonDashboardResponse {
+  lessons: AdminLessonSummary[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+export interface LessonDashboardQueryParams {
+  status?: LessonInstanceStatus;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}

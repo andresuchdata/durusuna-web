@@ -1,14 +1,35 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLesson, fetchLessonById, updateLesson } from "./api";
-import type { CreateLessonRequest, LessonInstance, UpdateLessonRequest } from "./types";
+import { createLesson, fetchAdminLessonsDashboard, fetchLessonById, updateLesson } from "./api";
+import type {
+  AdminLessonDashboardResponse,
+  CreateLessonRequest,
+  LessonDashboardQueryParams,
+  LessonInstance,
+  UpdateLessonRequest,
+} from "./types";
 
 export function useLesson(lessonId: string | undefined) {
   return useQuery<LessonInstance>({
     queryKey: ["lessons", lessonId],
     queryFn: () => fetchLessonById(lessonId!),
     enabled: !!lessonId,
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminLessonsDashboard(params: LessonDashboardQueryParams = {}) {
+  return useQuery<AdminLessonDashboardResponse>({
+    queryKey: [
+      "admin-lessons-dashboard",
+      params.status ?? null,
+      params.from ?? null,
+      params.to ?? null,
+      params.page ?? null,
+      params.limit ?? null,
+    ],
+    queryFn: () => fetchAdminLessonsDashboard(params),
     staleTime: 30_000,
   });
 }
