@@ -82,6 +82,7 @@ export interface ClassLesson {
 }
 
 export interface ClassSubject {
+  class_subject_id?: string;
   subject_id: string;
   subject_name: string;
   subject_code?: string;

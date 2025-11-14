@@ -69,7 +69,7 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
     ...(isTeacher ? [{ href: "/attendance", label: "Attendance", icon: ClipboardCheck }] : []),
     ...((isTeacher || isStudent) ? [{ href: "/assignments", label: "Assignments", icon: FileText }] : []),
     ...((isTeacher || isStudent) ? [{ href: "/grades", label: "Grades", icon: GraduationCap }] : []),
-    ...(isAdmin ? [{ href: "/users", label: "Users", icon: UserCog }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: LayoutDashboard }] : []),
     { href: "/profile", label: "Profile", icon: User },
   ];
 
