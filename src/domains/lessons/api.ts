@@ -22,6 +22,10 @@ export async function updateLesson(id: string, data: UpdateLessonRequest): Promi
   return res.data as LessonInstance;
 }
 
+export async function deleteLesson(id: string): Promise<void> {
+  await http().delete(`/lessons/${id}`);
+}
+
 export async function fetchAdminLessonsDashboard(
   params: LessonDashboardQueryParams = {}
 ): Promise<AdminLessonDashboardResponse> {

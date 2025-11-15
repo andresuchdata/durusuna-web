@@ -69,6 +69,10 @@ export interface LessonDashboardQueryParams {
   status?: LessonInstanceStatus;
   from?: string;
   to?: string;
+  class_id?: string;
+  subject_id?: string;
+  teacher_id?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }

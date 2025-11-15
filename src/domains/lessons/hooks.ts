@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLesson, fetchAdminLessonsDashboard, fetchLessonById, updateLesson } from "./api";
+import { createLesson, deleteLesson, fetchAdminLessonsDashboard, fetchLessonById, updateLesson } from "./api";
 import type {
   AdminLessonDashboardResponse,
   CreateLessonRequest,
@@ -26,6 +26,10 @@ export function useAdminLessonsDashboard(params: LessonDashboardQueryParams = {}
       params.status ?? null,
       params.from ?? null,
       params.to ?? null,
+      params.class_id ?? null,
+      params.subject_id ?? null,
+      params.teacher_id ?? null,
+      params.search ?? null,
       params.page ?? null,
       params.limit ?? null,
     ],
@@ -40,6 +44,7 @@ export function useCreateLesson() {
     mutationFn: (data: CreateLessonRequest) => createLesson(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["lessons"] });
+      qc.invalidateQueries({ queryKey: ["admin-lessons-dashboard"] });
     },
   });
 }
@@ -51,6 +56,18 @@ export function useUpdateLesson() {
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["lessons"] });
       qc.invalidateQueries({ queryKey: ["lessons", variables.id] });
+      qc.invalidateQueries({ queryKey: ["admin-lessons-dashboard"] });
+    },
+  });
+}
+
+export function useDeleteLesson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteLesson(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lessons"] });
+      qc.invalidateQueries({ queryKey: ["admin-lessons-dashboard"] });
     },
   });
 }
