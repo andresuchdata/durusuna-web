@@ -138,8 +138,13 @@ export default function AdminLessonsPage() {
       minWidth: "200px",
       sticky: true,
       render: (lesson) => (
-        <div>
-          <p className="font-medium text-sm text-foreground">{lesson.title || "(No title)"}</p>
+        <div className="space-y-1">
+          <Link
+            href={`/admin/lessons/${lesson.id}`}
+            className="font-medium text-sm text-primary hover:underline"
+          >
+            {lesson.title || "(No title)"}
+          </Link>
           <p className="text-xs text-muted-foreground">ID: {lesson.id}</p>
         </div>
       ),
@@ -163,7 +168,21 @@ export default function AdminLessonsPage() {
       header: "Teacher",
       sortable: true,
       minWidth: "160px",
-      render: (lesson) => lesson.teacher_name || "—",
+      render: (lesson) => {
+        if (!lesson.teacher_name) {
+          return "—";
+        }
+
+        if (!lesson.teacher_id) {
+          return lesson.teacher_name;
+        }
+
+        return (
+          <Link href={`/users/${lesson.teacher_id}`} className="text-primary hover:underline">
+            {lesson.teacher_name}
+          </Link>
+        );
+      },
     },
     {
       key: "scheduled_start",
@@ -268,9 +287,6 @@ export default function AdminLessonsPage() {
               <h1 className="text-3xl font-semibold text-slate-900">Lessons overview</h1>
               <p className="text-sm text-muted-foreground">Search, filter, and manage lesson instances across the school.</p>
             </div>
-            <Button asChild variant="outline">
-              <Link href="/admin/lessons/new">New lesson</Link>
-            </Button>
           </div>
         </div>
 

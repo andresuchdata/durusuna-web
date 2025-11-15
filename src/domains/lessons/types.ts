@@ -46,6 +46,9 @@ export type LessonInstanceStatus = LessonInstance["status"];
 
 export interface AdminLessonSummary {
   id: string;
+  class_id?: string | null;
+  subject_id?: string | null;
+  teacher_id?: string | null;
   title?: string | null;
   subject_name?: string | null;
   class_name?: string | null;
