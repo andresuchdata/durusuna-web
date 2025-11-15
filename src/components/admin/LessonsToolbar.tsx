@@ -15,8 +15,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { useClasses, useClassSubjects } from "@/domains/classes/hooks";
+import { useClasses } from "@/domains/classes/hooks";
 import { useContacts } from "@/domains/users/hooks";
+import { useSubjects } from "@/domains/subjects/hooks";
 import type { LessonInstanceStatus } from "@/domains/lessons/types";
 import type { DateRange } from "react-day-picker";
 
@@ -67,10 +68,10 @@ export function LessonsToolbar({
 }: LessonsToolbarProps) {
   const classesQuery = useClasses({ is_active: true });
   const teachersQuery = useContacts({ userType: "teacher", limit: 100 });
-  const { data: classSubjectsData, isLoading: classSubjectsLoading } = useClassSubjects(classId);
+  const subjectsQuery = useSubjects();
 
   const teachers = teachersQuery.data?.contacts ?? [];
-  const subjects = classSubjectsData?.subjects ?? [];
+  const subjects = subjectsQuery.data?.subjects ?? [];
 
   const selectedDateLabel = useMemo(() => {
     if (fromDate && toDate) {
@@ -134,7 +135,6 @@ export function LessonsToolbar({
           onValueChange={(value) => {
             const nextValue = value === "all" ? undefined : value;
             onClassChange(nextValue);
-            onSubjectChange(undefined);
           }}
         >
           <SelectTrigger className="w-[200px] bg-white">
@@ -153,16 +153,16 @@ export function LessonsToolbar({
         <Select
           value={subjectId ?? "all"}
           onValueChange={(value) => onSubjectChange(value === "all" ? undefined : value)}
-          disabled={!classId || classSubjectsLoading}
+          disabled={subjectsQuery.isLoading}
         >
           <SelectTrigger className="w-[200px] bg-white">
-            <SelectValue placeholder={classId ? "Subject" : "Select class first"} />
+            <SelectValue placeholder="Subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All subjects</SelectItem>
             {subjects.map((subject) => (
-              <SelectItem key={subject.subject_id} value={subject.subject_id}>
-                {subject.subject_name}
+              <SelectItem key={subject.id} value={subject.id}>
+                {subject.name}
               </SelectItem>
             ))}
           </SelectContent>

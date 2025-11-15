@@ -1,53 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
-import type { NavProps } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import "react-day-picker/dist/style.css";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
-
-function CalendarNav({
-  className,
-  onNextClick,
-  onPreviousClick,
-  ...props
-}: NavProps) {
-  const buttonClassName = cn(
-    buttonVariants({ variant: "outline" }),
-    "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100"
-  );
-
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between px-2 pb-2 sm:px-3",
-        className
-      )}
-      {...props}
-    >
-      <button
-        type="button"
-        onClick={onPreviousClick}
-        className={buttonClassName}
-        aria-label="Go to previous month"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={onNextClick}
-        className={buttonClassName}
-        aria-label="Go to next month"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
 
 function Calendar({
   className,
@@ -63,12 +22,19 @@ function Calendar({
         months:
           "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-center sm:gap-6",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 items-center text-center",
+        caption: "flex justify-center pt-1 relative items-center text-center",
         caption_label: "text-sm font-medium",
+        nav: "flex items-center space-x-1",
+        nav_button: cn(
+          buttonVariants({ variant: "ghost" }),
+          "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100"
+        ),
+        nav_button_previous: "absolute left-1",
+        nav_button_next: "absolute right-1",
         table: "w-full border-collapse select-none",
         head_row: "grid grid-cols-7",
         head_cell:
-          "text-muted-foreground rounded-md flex items-center justify-center px-0 py-1 text-xs font-medium uppercase tracking-normal",
+          "text-muted-foreground flex h-9 items-center justify-center rounded-md text-[0.8rem] font-medium uppercase tracking-normal",
         row: "grid grid-cols-7 mt-2 gap-y-0",
         cell: "text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
@@ -88,7 +54,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Nav: (navProps) => <CalendarNav {...navProps} />,
+        ...props.components,
       }}
       formatters={{
         formatWeekdayName: (date) => {
