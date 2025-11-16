@@ -80,9 +80,16 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
       { href: "/class-updates", label: "Updates", icon: BookOpen },
     ];
 
-    if (isTeacher || isAdmin || isParent || isStudent) {
-      base.push({ href: "/classes", label: "Classes", icon: Users });
-    }
+    base.push({
+      label: "Learning",
+      icon: Users,
+      children: [
+        { href: "/lessons", label: "Lessons" },
+        { href: "/assignments", label: "Assignments" },
+        { href: "/classes", label: "Classes" },
+        { href: "/grades", label: "Grades" },
+      ],
+    });
 
     if (isAdmin) {
       base.push({

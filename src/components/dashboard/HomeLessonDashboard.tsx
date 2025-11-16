@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, type ElementType } from "react";
-import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,10 +12,22 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { useTeacherDailyLessons, useTeacherLessonSummary, useUpdateTeacherLessonStatus } from "@/domains/teacher-dashboard/hooks";
+import {
+  useTeacherDailyLessons,
+  useTeacherLessonSummary,
+  useUpdateTeacherLessonStatus,
+} from "@/domains/teacher-dashboard/hooks";
 import { TeacherLessonSummary } from "@/domains/teacher-dashboard/types";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, CalendarDays, Clock3, BookOpen, CheckCircle2, PlayCircle, Layers3 } from "lucide-react";
+import {
+  Loader2,
+  CalendarDays,
+  Clock3,
+  BookOpen,
+  CheckCircle2,
+  PlayCircle,
+  Layers3,
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -102,11 +113,7 @@ function SummaryTile({ label, value, icon: Icon }: { label: string; value: numbe
 
 function LessonCard({ lesson, onSelect }: { lesson: TeacherLessonSummary; onSelect: (lesson: TeacherLessonSummary) => void }) {
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(lesson)}
-      className="text-left"
-    >
+    <button type="button" onClick={() => onSelect(lesson)} className="text-left">
       <Card className="border border-slate-200/80 shadow-sm transition-all duration-150 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
         <CardContent className="flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -137,7 +144,7 @@ function LessonCard({ lesson, onSelect }: { lesson: TeacherLessonSummary; onSele
   );
 }
 
-export default function TeacherDashboardPage() {
+export function HomeLessonDashboard() {
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedLesson, setSelectedLesson] = useState<TeacherLessonSummary | null>(null);
@@ -179,72 +186,66 @@ export default function TeacherDashboardPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 md:py-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Today&apos;s Lessons</h1>
-            <p className="text-sm text-muted-foreground">{formatDateLabel(selectedDate)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-muted-foreground" htmlFor="date-picker">
-              Date
-            </label>
-            <div className="relative">
-              <input
-                id="date-picker"
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-              />
-              <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            </div>
+    <div className="w-full max-w-5xl py-6 md:py-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Today&apos;s Lessons</h1>
+          <p className="text-sm text-muted-foreground">{formatDateLabel(selectedDate)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="date-picker">
+            Date
+          </label>
+          <div className="relative">
+            <input
+              id="date-picker"
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+            <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <SummaryTile label="Total" value={summary.total} icon={Layers3} />
-          <SummaryTile label="Planned" value={summary.planned} icon={PlayCircle} />
-          <SummaryTile label="In Session" value={summary.ongoing} icon={Clock3} />
-          <SummaryTile label="Completed" value={summary.completed} icon={CheckCircle2} />
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <SummaryTile label="Total" value={summary.total} icon={Layers3} />
+        <SummaryTile label="Planned" value={summary.planned} icon={PlayCircle} />
+        <SummaryTile label="In Session" value={summary.ongoing} icon={Clock3} />
+        <SummaryTile label="Completed" value={summary.completed} icon={CheckCircle2} />
+      </div>
 
-        <div className="mt-6">
-          <Card className="border border-slate-200/80 shadow-sm">
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="flex flex-col gap-3 p-4">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="h-20 rounded-lg bg-slate-100/70 animate-pulse" />
-                  ))}
-                </div>
-              ) : lessons.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-                  <BookOpen className="h-12 w-12 text-slate-300" />
-                  <p className="text-base font-medium text-slate-700">No lessons scheduled</p>
-                  <p className="text-sm text-muted-foreground">Lessons for the selected date will appear here.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 p-4">
-                  {lessons.map((lesson) => (
-                    <LessonCard
-                      key={lesson.id}
-                      lesson={lesson}
-                      onSelect={(selected) => setSelectedLesson(selected)}
-                    />
-                  ))}
-                </div>
-              )}
+      <div className="mt-6">
+        <Card className="border border-slate-200/80 shadow-sm">
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="flex flex-col gap-3 p-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-20 rounded-lg bg-slate-100/70 animate-pulse" />
+                ))}
+              </div>
+            ) : lessons.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
+                <BookOpen className="h-12 w-12 text-slate-300" />
+                <p className="text-base font-medium text-slate-700">No lessons scheduled</p>
+                <p className="text-sm text-muted-foreground">Lessons for the selected date will appear here.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 p-4">
+                {lessons.map((lesson) => (
+                  <LessonCard key={lesson.id} lesson={lesson} onSelect={(selected) => setSelectedLesson(selected)} />
+                ))}
+              </div>
+            )}
 
-              {isFetching && !isLoading && (
-                <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3 text-xs text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Refreshing schedule…
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            {isFetching && !isLoading && (
+              <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Refreshing schedule…
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Sheet open={!!selectedLesson} onOpenChange={(open) => !open && setSelectedLesson(null)}>
@@ -259,9 +260,11 @@ export default function TeacherDashboardPage() {
           )}
         </SheetContent>
       </Sheet>
-    </AppLayout>
+    </div>
   );
 }
+
+export default HomeLessonDashboard;
 
 function LessonDetailContent({
   lesson,
@@ -356,21 +359,13 @@ function LessonDetailContent({
 
       <div className="flex flex-col gap-2">
         {lesson.status === "planned" && (
-          <Button
-            onClick={() => onUpdateStatus(lesson)}
-            className="w-full"
-            disabled={statusUpdating}
-          >
+          <Button onClick={() => onUpdateStatus(lesson)} className="w-full" disabled={statusUpdating}>
             {statusUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
             Start lesson
           </Button>
         )}
         {lesson.status === "in_session" && (
-          <Button
-            onClick={() => onUpdateStatus(lesson)}
-            className="w-full"
-            disabled={statusUpdating}
-          >
+          <Button onClick={() => onUpdateStatus(lesson)} className="w-full" disabled={statusUpdating}>
             {statusUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
             Mark as completed
           </Button>
