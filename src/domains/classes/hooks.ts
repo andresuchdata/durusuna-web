@@ -11,6 +11,7 @@ import {
   fetchClassTeachers,
   fetchClassLessons,
   fetchClassSubjects,
+  fetchClassOfferings,
 } from "./api";
 import type {
   Class,
@@ -19,6 +20,7 @@ import type {
   UpdateClassRequest,
   ClassFilters,
   ClassSubjectsResponse,
+  ClassOfferingsResponse,
 } from "./types";
 
 /**
@@ -136,3 +138,14 @@ export function useClassSubjects(classId: string | undefined) {
   });
 }
 
+/**
+ * Hook to fetch class offerings for a class
+ */
+export function useClassOfferings(classId: string | undefined) {
+  return useQuery<ClassOfferingsResponse>({
+    queryKey: ["classes", classId, "offerings"],
+    queryFn: () => fetchClassOfferings(classId!),
+    enabled: !!classId,
+    staleTime: 30_000,
+  });
+}

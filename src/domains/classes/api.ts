@@ -7,6 +7,7 @@ import type {
   ClassFilters,
   ClassesResponse,
   ClassSubjectsResponse,
+  ClassOfferingsResponse,
 } from "./types";
 
 /**
@@ -116,3 +117,10 @@ export async function fetchClassSubjects(classId: string): Promise<ClassSubjects
   return res.data as ClassSubjectsResponse;
 }
 
+/**
+ * Fetch class offerings (subject-class combinations) for a class
+ */
+export async function fetchClassOfferings(classId: string): Promise<ClassOfferingsResponse> {
+  const res = await http().get(`/classes/${classId}/offerings`);
+  return res.data as ClassOfferingsResponse;
+}
