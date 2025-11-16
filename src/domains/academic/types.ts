@@ -13,7 +13,16 @@ export interface AcademicPeriodSummary {
   end_date: string;
 }
 
+export interface AcademicPeriodWithYearSummary extends AcademicPeriodSummary {
+  is_current: boolean;
+  academic_year: AcademicYearSummary;
+}
+
 export interface CurrentAcademicPeriodResponse {
   academic_year: AcademicYearSummary;
   current_period: AcademicPeriodSummary;
+}
+
+export interface AcademicPeriodsResponse {
+  academic_periods: AcademicPeriodWithYearSummary[];
 }

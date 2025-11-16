@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
 import { usePermissions } from "@/domains/access/hooks";
-import { useCurrentAcademicPeriod } from "@/domains/academic/hooks";
 import { useClasses, useClassOfferings } from "@/domains/classes/hooks";
 import { useAssessments, useReportCards, useGenerateReportCards } from "@/domains/grades/hooks";
 import type { Class } from "@/domains/classes/types";
@@ -16,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FileText, ListChecks, GraduationCap } from "lucide-react";
+import { AcademicPeriodSelector } from "@/components/academic/AcademicPeriodSelector";
 
 type GradesTab = "assessments" | "report-cards";
 
@@ -283,14 +283,9 @@ export default function GradesPage() {
   const classesQuery = useClasses();
   const classes = classesQuery.data ?? [];
 
-  const { data: periodData, isLoading: periodLoading } = useCurrentAcademicPeriod();
-  const currentPeriodId = periodData?.current_period.id;
-  const currentPeriodLabel = periodData
-    ? `${periodData.current_period.name} · ${periodData.academic_year.name}`
-    : undefined;
-
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [selectedOfferingId, setSelectedOfferingId] = useState<string | undefined>(undefined);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<GradesTab>("assessments");
 
   useEffect(() => {
@@ -328,13 +323,13 @@ export default function GradesPage() {
 
   const reportCardsParams = useMemo(
     () =>
-      selectedClassId && currentPeriodId
+      selectedClassId && selectedPeriodId
         ? {
             class_id: selectedClassId,
-            academic_period_id: currentPeriodId,
+            academic_period_id: selectedPeriodId,
           }
         : undefined,
-    [selectedClassId, currentPeriodId]
+    [selectedClassId, selectedPeriodId]
   );
 
   const reportCardsQuery = useReportCards(reportCardsParams);
@@ -343,7 +338,7 @@ export default function GradesPage() {
 
   const canViewGrades = permissions?.canViewGrades ?? false;
 
-  if (permissionsLoading || periodLoading || classesQuery.isLoading) {
+  if (permissionsLoading || classesQuery.isLoading) {
     return (
       <AppLayout>
         <div className="min-h-[50vh] flex items-center justify-center text-muted-foreground">Loading grades…</div>
@@ -377,8 +372,8 @@ export default function GradesPage() {
 
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-              <span className="font-medium">Current academic period</span>
-              <span>{currentPeriodLabel ?? "Not set"}</span>
+              <span className="font-medium">Academic period</span>
+              <AcademicPeriodSelector value={selectedPeriodId} onChange={setSelectedPeriodId} />
             </div>
             <div className="inline-flex items-center rounded-full bg-slate-100 p-1 text-xs">
               <button
@@ -442,14 +437,14 @@ export default function GradesPage() {
                       <FileText className="h-3.5 w-3.5" />
                       <span>Report cards for selected class and period</span>
                     </div>
-                    {selectedClassId && currentPeriodId && (
+                    {selectedClassId && selectedPeriodId && (
                       <PermissionGuard requiredRole="admin" showFallback={false}>
                         <Button
                           size="sm"
                           onClick={() =>
                             generateReportCardsMutation.mutate({
                               class_id: selectedClassId,
-                              academic_period_id: currentPeriodId,
+                              academic_period_id: selectedPeriodId,
                             })
                           }
                           disabled={generateReportCardsMutation.isPending}
