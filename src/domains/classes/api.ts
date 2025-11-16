@@ -120,7 +120,20 @@ export async function fetchClassSubjects(classId: string): Promise<ClassSubjects
 /**
  * Fetch class offerings (subject-class combinations) for a class
  */
-export async function fetchClassOfferings(classId: string): Promise<ClassOfferingsResponse> {
-  const res = await http().get(`/classes/${classId}/offerings`);
+export async function fetchClassOfferings(
+  classId: string,
+  params?: { academic_period_id?: string }
+): Promise<ClassOfferingsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.academic_period_id) {
+    queryParams.append("academic_period_id", params.academic_period_id);
+  }
+
+  const queryString = queryParams.toString();
+  const url = queryString
+    ? `/classes/${classId}/offerings?${queryString}`
+    : `/classes/${classId}/offerings`;
+
+  const res = await http().get(url);
   return res.data as ClassOfferingsResponse;
 }

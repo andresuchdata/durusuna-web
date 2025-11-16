@@ -294,7 +294,7 @@ export default function GradesPage() {
     }
   }, [classes, selectedClassId]);
 
-  const offeringsQuery = useClassOfferings(selectedClassId);
+  const offeringsQuery = useClassOfferings(selectedClassId, selectedPeriodId);
   const offerings = offeringsQuery.data?.offerings;
 
   useEffect(() => {

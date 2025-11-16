@@ -141,11 +141,15 @@ export function useClassSubjects(classId: string | undefined) {
 /**
  * Hook to fetch class offerings for a class
  */
-export function useClassOfferings(classId: string | undefined) {
+export function useClassOfferings(classId: string | undefined, academicPeriodId?: string) {
   return useQuery<ClassOfferingsResponse>({
-    queryKey: ["classes", classId, "offerings"],
-    queryFn: () => fetchClassOfferings(classId!),
-    enabled: !!classId,
+    queryKey: ["classes", classId, "offerings", academicPeriodId ?? "all"],
+    queryFn: () =>
+      fetchClassOfferings(
+        classId!,
+        academicPeriodId ? { academic_period_id: academicPeriodId } : undefined
+      ),
+    enabled: !!classId && !!academicPeriodId,
     staleTime: 30_000,
   });
 }
