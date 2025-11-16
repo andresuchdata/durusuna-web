@@ -19,6 +19,7 @@ import {
 } from "@/domains/teacher-dashboard/hooks";
 import { TeacherLessonSummary } from "@/domains/teacher-dashboard/types";
 import { useToast } from "@/components/ui/use-toast";
+import { useProfile } from "@/domains/auth/hooks";
 import {
   Loader2,
   CalendarDays,
@@ -145,6 +146,27 @@ function LessonCard({ lesson, onSelect }: { lesson: TeacherLessonSummary; onSele
 }
 
 export function HomeLessonDashboard() {
+  const { data: profile } = useProfile();
+  const role = (profile?.user_type as "teacher" | "student" | "parent" | "admin" | undefined) ?? (profile?.role === "admin" ? "admin" : "teacher");
+
+  const title =
+    role === "teacher"
+      ? "Today's lessons you teach"
+      : role === "student"
+      ? "Today's lessons for you"
+      : role === "parent"
+      ? "Today's lessons for your child"
+      : "Today's lessons";
+
+  const emptyDescription =
+    role === "teacher"
+      ? "Lessons you teach for the selected date will appear here."
+      : role === "student"
+      ? "Your lessons for the selected date will appear here."
+      : role === "parent"
+      ? "Your child's lessons for the selected date will appear here."
+      : "Lessons for the selected date will appear here.";
+
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedLesson, setSelectedLesson] = useState<TeacherLessonSummary | null>(null);
@@ -187,26 +209,11 @@ export function HomeLessonDashboard() {
 
   return (
     <div className="w-full max-w-5xl py-6 md:py-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Today&apos;s Lessons</h1>
-          <p className="text-sm text-muted-foreground">{formatDateLabel(selectedDate)}</p>
+          <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="date-picker">
-            Date
-          </label>
-          <div className="relative">
-            <input
-              id="date-picker"
-              type="date"
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-            <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">{formatDateLabel(selectedDate)}</p>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -229,7 +236,7 @@ export function HomeLessonDashboard() {
               <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
                 <BookOpen className="h-12 w-12 text-slate-300" />
                 <p className="text-base font-medium text-slate-700">No lessons scheduled</p>
-                <p className="text-sm text-muted-foreground">Lessons for the selected date will appear here.</p>
+                <p className="text-sm text-muted-foreground">{emptyDescription}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3 p-4">

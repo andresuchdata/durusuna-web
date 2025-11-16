@@ -6,7 +6,7 @@ import {
 } from "./types";
 
 export async function fetchTeacherDailyLessons(date?: string): Promise<TeacherLessonDashboardResponse> {
-  const res = await http().get("/lessons/teacher/dashboard", {
+  const res = await http().get("/dashboard/lessons", {
     params: date ? { date } : undefined,
   });
   return res.data as TeacherLessonDashboardResponse;

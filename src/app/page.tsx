@@ -140,15 +140,8 @@ export default function Home() {
   const availableActions = QUICK_ACTIONS.filter((action) => action.roles.includes(role));
 
   const renderRoleDashboard = () => {
-    if (profile.user_type === "teacher") return <HomeLessonDashboard />;
     if (profile.user_type === "admin" || profile.role === "admin") return <AdminDashboard />;
-    if (profile.user_type === "parent") return <ParentDashboard />;
-    if (profile.user_type === "student") return <StudentDashboard />;
-    return (
-      <div className="min-h-[30vh] flex items-center justify-center text-muted-foreground">
-        Dashboard coming soon for your role.
-      </div>
-    );
+    return <HomeLessonDashboard />;
   };
 
   return (
