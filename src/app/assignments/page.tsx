@@ -6,6 +6,8 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
 import { useUserAssignments } from "@/domains/assignments/hooks";
 import type { AssignmentSummary, AssignmentType } from "@/domains/assignments/types";
+import { useSubjects } from "@/domains/subjects/hooks";
+import { useClasses } from "@/domains/classes/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -138,71 +140,25 @@ export default function AssignmentsPage() {
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
 
+  const subjectsQuery = useSubjects();
+  const classesQuery = useClasses({ is_active: true });
+
   const params = useMemo(
     () => ({
       page: 1,
       limit: 50,
       type,
       search: search || undefined,
+      subject_id: subjectFilter !== "all" ? subjectFilter : undefined,
+      class_id: classFilter !== "all" ? classFilter : undefined,
+      due_date_from: dueFrom || undefined,
+      due_date_to: dueTo || undefined,
     }),
-    [type, search]
+    [type, search, subjectFilter, classFilter, dueFrom, dueTo]
   );
 
   const assignmentsQuery = useUserAssignments(params);
-  const allAssignments = assignmentsQuery.data?.assignments ?? [];
-
-  const subjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          allAssignments
-            .map((a) => a.subject_name)
-            .filter((name): name is string => !!name)
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [allAssignments]
-  );
-
-  const classOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          allAssignments
-            .map((a) => a.class_name)
-            .filter((name): name is string => !!name)
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [allAssignments]
-  );
-
-  const filteredAssignments = useMemo(
-    () =>
-      allAssignments.filter((a) => {
-        if (subjectFilter !== "all") {
-          if ((a.subject_name ?? "") !== subjectFilter) return false;
-        }
-        if (classFilter !== "all") {
-          if ((a.class_name ?? "") !== classFilter) return false;
-        }
-        if (dueFrom || dueTo) {
-          if (!a.due_date) return false;
-          const due = new Date(a.due_date);
-          if (Number.isNaN(due.getTime())) return false;
-          if (dueFrom) {
-            const from = new Date(dueFrom);
-            from.setHours(0, 0, 0, 0);
-            if (due < from) return false;
-          }
-          if (dueTo) {
-            const to = new Date(dueTo);
-            to.setHours(23, 59, 59, 999);
-            if (due > to) return false;
-          }
-        }
-        return true;
-      }),
-    [allAssignments, subjectFilter, classFilter, dueFrom, dueTo]
-  );
+  const assignments = assignmentsQuery.data?.assignments ?? [];
 
   return (
     <AppLayout>
@@ -256,9 +212,9 @@ export default function AssignmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All subjects</SelectItem>
-                    {subjectOptions.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {subjectsQuery.data?.subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id}>
+                        {subject.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -269,9 +225,9 @@ export default function AssignmentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All classes</SelectItem>
-                    {classOptions.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {classesQuery.data?.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -318,7 +274,7 @@ export default function AssignmentsPage() {
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
             <AssignmentsTable
-              assignments={filteredAssignments}
+              assignments={assignments}
               isLoading={assignmentsQuery.isLoading}
             />
           </div>

@@ -27,8 +27,10 @@ export interface AssignmentSummary {
   created_by: string;
   created_at: string;
   updated_at: string;
+  subject_id?: string | null;
   subject_name?: string | null;
   subject_code?: string | null;
+  class_id?: string | null;
   class_name?: string | null;
   creator_first_name?: string | null;
   creator_last_name?: string | null;
@@ -63,6 +65,8 @@ export interface AssignmentListQueryParams {
   subject_id?: string;
   class_id?: string;
   academic_period_id?: string;
+   due_date_from?: string;
+   due_date_to?: string;
 }
 
 export interface AssignmentDetailsStudentSubmission {

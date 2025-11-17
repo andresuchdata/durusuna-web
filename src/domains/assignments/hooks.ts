@@ -29,6 +29,8 @@ export function useUserAssignments(params: AssignmentListQueryParams | undefined
       params?.subject_id ?? null,
       params?.class_id ?? null,
       params?.academic_period_id ?? null,
+      params?.due_date_from ?? null,
+      params?.due_date_to ?? null,
     ],
     queryFn: () => fetchUserAssignments(params ?? {}),
     enabled: !!params,
