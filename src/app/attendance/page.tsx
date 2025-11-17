@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
 import { useTeacherDailyLessons } from "@/domains/teacher-dashboard/hooks";
 import type { TeacherLessonSummary } from "@/domains/teacher-dashboard/types";
+import { useClasses } from "@/domains/classes/hooks";
+import { useStudentAttendanceHistory } from "@/domains/attendance/hooks";
+import type { AttendanceStatus } from "@/domains/attendance/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,11 +145,25 @@ export default function AttendancePage() {
   const [currentDate, setCurrentDate] = useState(today);
   const [visibleStartDate, setVisibleStartDate] = useState(today);
 
+  const classesQuery = useClasses();
+  const classes = classesQuery.data ?? [];
+  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!selectedClassId && classes.length > 0) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [selectedClassId, classes]);
+
   const { data, isLoading: lessonsLoading, isFetching } = useTeacherDailyLessons(
     currentDate === today ? undefined : currentDate
   );
 
   const lessons = data?.lessons ?? [];
+
+  const studentId = role === "student" ? profile?.id : undefined;
+  const studentHistoryQuery = useStudentAttendanceHistory(studentId, role === "student" ? selectedClassId : undefined);
+  const history = studentHistoryQuery.data?.history ?? [];
 
   const dateStripDays = useMemo(() => {
     const start = new Date(visibleStartDate);
@@ -297,11 +314,129 @@ export default function AttendancePage() {
                 </CardContent>
               </Card>
             </>
+          ) : role === "student" ? (
+            <>
+              <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center text-white shadow-sm">
+                    <CalendarDays className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">Student · Attendance</p>
+                    <h1 className="text-2xl font-semibold text-slate-900">My attendance</h1>
+                    <p className="text-xs text-muted-foreground">
+                      Choose a class to see your attendance history.
+                    </p>
+                  </div>
+                </div>
+              </header>
+
+              {classes.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground">Classes</p>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {classes.map((cls) => {
+                      const isActive = cls.id === selectedClassId;
+                      return (
+                        <button
+                          key={cls.id}
+                          type="button"
+                          onClick={() => setSelectedClassId(cls.id)}
+                          className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-all ${
+                            isActive
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          {cls.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <Card className="border-dashed border-slate-300 bg-white/80">
+                  <CardContent className="py-10 flex flex-col items-center justify-center text-center gap-3">
+                    <CalendarDays className="h-10 w-10 text-slate-300" />
+                    <p className="text-sm font-medium text-slate-800">No classes found</p>
+                    <p className="text-xs text-muted-foreground max-w-sm">
+                      Once you are enrolled in classes, you will see your attendance history here.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {classes.length > 0 && (
+                <Card className="border border-slate-200/80 bg-white/90 shadow-sm">
+                  <CardContent className="p-4 space-y-3">
+                    {studentHistoryQuery.isLoading ? (
+                      <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                          <Skeleton key={index} className="h-10 w-full rounded-lg" />
+                        ))}
+                      </div>
+                    ) : history.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-muted-foreground">
+                        No attendance records yet for this class.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        {history
+                          .slice()
+                          .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+                          .map((record) => {
+                            const dateLabel = formatDateLabel(record.attendance_date);
+                            const status: AttendanceStatus = record.status;
+                            const statusConfig: Record<AttendanceStatus, { label: string; className: string }> = {
+                              present: {
+                                label: "Present",
+                                className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                              },
+                              absent: {
+                                label: "Absent",
+                                className: "bg-rose-100 text-rose-700 border-rose-200",
+                              },
+                              excused: {
+                                label: "Excused",
+                                className: "bg-sky-100 text-sky-700 border-sky-200",
+                              },
+                              late: {
+                                label: "Late",
+                                className: "bg-amber-100 text-amber-700 border-amber-200",
+                              },
+                            };
+                            const cfg = statusConfig[status];
+
+                            return (
+                              <div
+                                key={`${record.attendance_date}-${record.id}`}
+                                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-medium text-slate-900">{dateLabel}</span>
+                                  <span className="text-[11px] text-muted-foreground">Status for this day</span>
+                                </div>
+                                <span
+                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${cfg.className}`}
+                                >
+                                  {cfg.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
             <div className="container mx-auto p-4 md:p-6">
               <h1 className="text-2xl md:text-3xl font-bold mb-3">Attendance</h1>
               <p className="text-sm text-muted-foreground">
-                Attendance views for students and parents will appear here.
+                Attendance views for parents and other roles will appear here.
               </p>
             </div>
           )}

@@ -3,8 +3,10 @@ import type {
   AttendanceRecord,
   BulkUpdateAttendanceRequestPayload,
   BulkUpdateAttendanceResponse,
+  FinalizeAttendanceResponse,
   MarkStudentAttendancePayload,
   OpenAttendanceSessionResponse,
+  StudentAttendanceHistoryResponse,
   TeacherAttendanceStatusResponse,
   TeacherAttendanceSubmitPayload,
   TeacherAttendanceSubmitResponse,
@@ -24,6 +26,14 @@ export async function bulkUpdateAttendance(
 ): Promise<BulkUpdateAttendanceResponse> {
   const res = await http().post(`/attendance/bulk-update/${classId}`, payload);
   return res.data as BulkUpdateAttendanceResponse;
+}
+
+export async function finalizeAttendanceSession(
+  classId: string,
+  payload: { date: string }
+): Promise<FinalizeAttendanceResponse> {
+  const res = await http().post(`/attendance/sessions/${classId}/finalize`, payload);
+  return res.data as FinalizeAttendanceResponse;
 }
 
 export async function markStudentAttendance(
@@ -49,4 +59,14 @@ export async function submitTeacherAttendance(
 ): Promise<TeacherAttendanceSubmitResponse> {
   const res = await http().post("/attendance/teacher/submit", payload);
   return res.data as TeacherAttendanceSubmitResponse;
+}
+
+export async function fetchStudentAttendanceHistory(
+  studentId: string,
+  classId: string
+): Promise<StudentAttendanceHistoryResponse> {
+  const res = await http().get(`/attendance/student/${studentId}/history`, {
+    params: { class_id: classId },
+  });
+  return res.data as StudentAttendanceHistoryResponse;
 }

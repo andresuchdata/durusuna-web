@@ -81,6 +81,15 @@ export interface BulkUpdateAttendanceResponse {
   records: AttendanceRecord[];
 }
 
+export interface FinalizeAttendanceResponse {
+  message: string;
+  session: AttendanceSession;
+}
+
+export interface StudentAttendanceHistoryResponse {
+  history: AttendanceRecord[];
+}
+
 export interface MarkStudentAttendancePayload {
   date: string;
   status: AttendanceStatus;

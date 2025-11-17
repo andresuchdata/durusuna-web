@@ -6,14 +6,18 @@ import {
   getTeacherAttendanceStatus,
   markStudentAttendance,
   openAttendanceSession,
+  finalizeAttendanceSession,
+  fetchStudentAttendanceHistory,
   submitTeacherAttendance,
 } from "./api";
 import type {
   AttendanceRecord,
   BulkUpdateAttendanceRequestPayload,
   BulkUpdateAttendanceResponse,
+  FinalizeAttendanceResponse,
   MarkStudentAttendancePayload,
   OpenAttendanceSessionResponse,
+  StudentAttendanceHistoryResponse,
   TeacherAttendanceStatusResponse,
   TeacherAttendanceSubmitPayload,
   TeacherAttendanceSubmitResponse,
@@ -28,6 +32,18 @@ export function useOpenAttendanceSession(
     queryKey: ["attendance", "session", classId, date, lessonInstanceId ?? null],
     queryFn: () => openAttendanceSession(classId!, { date: date!, lesson_instance_id: lessonInstanceId }),
     enabled: !!classId && !!date,
+    staleTime: 30_000,
+  });
+}
+
+export function useStudentAttendanceHistory(
+  studentId: string | undefined,
+  classId: string | undefined
+) {
+  return useQuery<StudentAttendanceHistoryResponse>({
+    queryKey: ["attendance", "student", studentId, "history", classId],
+    queryFn: () => fetchStudentAttendanceHistory(studentId!, classId!),
+    enabled: !!studentId && !!classId,
     staleTime: 30_000,
   });
 }
@@ -52,10 +68,11 @@ export function useMarkStudentAttendance() {
   });
 }
 
-export function useTeacherAttendanceStatus(date?: string) {
+export function useTeacherAttendanceStatus(date: string | undefined) {
   return useQuery<TeacherAttendanceStatusResponse>({
     queryKey: ["attendance", "teacher", "status", date ?? "today"],
     queryFn: () => getTeacherAttendanceStatus(date),
+    enabled: !!date,
     staleTime: 30_000,
   });
 }
@@ -63,5 +80,15 @@ export function useTeacherAttendanceStatus(date?: string) {
 export function useSubmitTeacherAttendance() {
   return useMutation<TeacherAttendanceSubmitResponse, unknown, TeacherAttendanceSubmitPayload>({
     mutationFn: (payload) => submitTeacherAttendance(payload),
+  });
+}
+
+export function useFinalizeAttendanceSession() {
+  return useMutation<
+    FinalizeAttendanceResponse,
+    unknown,
+    { classId: string; payload: { date: string } }
+  >({
+    mutationFn: ({ classId, payload }) => finalizeAttendanceSession(classId, payload),
   });
 }

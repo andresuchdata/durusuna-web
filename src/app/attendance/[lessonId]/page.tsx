@@ -8,7 +8,10 @@ import { useProfile } from "@/domains/auth/hooks";
 import { useTeacherLessonSummary } from "@/domains/teacher-dashboard/hooks";
 import {
   useBulkUpdateAttendance,
+  useFinalizeAttendanceSession,
   useOpenAttendanceSession,
+  useSubmitTeacherAttendance,
+  useTeacherAttendanceStatus,
 } from "@/domains/attendance/hooks";
 import type { AttendanceStatus } from "@/domains/attendance/types";
 import { Button } from "@/components/ui/button";
@@ -145,10 +148,20 @@ export default function LessonAttendanceDetailPage() {
 
   const sessionQuery = useOpenAttendanceSession(classId ?? undefined, sessionDate, lessonId);
   const bulkMutation = useBulkUpdateAttendance();
+  const teacherAttendanceQuery = useTeacherAttendanceStatus(sessionDate);
+  const submitTeacherAttendanceMutation = useSubmitTeacherAttendance();
+  const finalizeMutation = useFinalizeAttendanceSession();
 
   const [localStatuses, setLocalStatuses] = useState<Record<string, AttendanceStatus | undefined>>({});
+  const [activeTab, setActiveTab] = useState<"students" | "teacher">("students");
+  const [teacherStatusChoice, setTeacherStatusChoice] = useState<AttendanceStatus | undefined>(undefined);
 
   const students = sessionQuery.data?.students ?? [];
+  const teacherAttendance = teacherAttendanceQuery.data?.attendance ?? null;
+
+  const currentTeacherStatus: AttendanceStatus | undefined =
+    teacherStatusChoice ?? teacherAttendance?.status ?? undefined;
+  const isSessionFinalized = sessionQuery.data?.session.is_finalized ?? false;
 
   const isTeacherOrAdmin = profile?.user_type === "teacher" || profile?.role === "admin";
 
@@ -164,6 +177,31 @@ export default function LessonAttendanceDetailPage() {
       next[s.user_id] = "present";
     }
     setLocalStatuses(next);
+  };
+
+  const handleSubmitMyAttendance = async () => {
+    if (!sessionDate) return;
+    const status = teacherStatusChoice;
+    if (!status) return;
+
+    await submitTeacherAttendanceMutation.mutateAsync({
+      date: sessionDate,
+      status,
+      marked_via: "manual",
+    });
+
+    await teacherAttendanceQuery.refetch();
+  };
+
+  const handleFinalize = async () => {
+    if (!sessionDate || !classId) return;
+
+    await finalizeMutation.mutateAsync({
+      classId,
+      payload: { date: sessionDate },
+    });
+
+    await sessionQuery.refetch();
   };
 
   const handleSave = async () => {
@@ -319,73 +357,175 @@ export default function LessonAttendanceDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200/80 bg-white/90 shadow-sm">
-            <CardContent className="space-y-4 p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Users className="h-3.5 w-3.5" />
-                  <span>Students in this class</span>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="inline-flex rounded-full bg-slate-100 p-0.5 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setActiveTab("students")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  activeTab === "students"
+                    ? "bg-white shadow-sm text-slate-900"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Students
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("teacher")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  activeTab === "teacher"
+                    ? "bg-white shadow-sm text-slate-900"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                My attendance
+              </button>
+            </div>
+          </div>
+
+          {activeTab === "teacher" && (
+            <Card className="border border-slate-200/80 bg-white/90 shadow-sm">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">My attendance for this day</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Choose your status for this school day. This is separate from student attendance.
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <StudentStatusPill
+                      value={currentTeacherStatus}
+                      onChange={(status) => setTeacherStatusChoice(status)}
+                    />
+                    {teacherAttendance && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Last submitted: <span className="font-medium">{teacherAttendance.status}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={handleMarkAllPresent}
-                    disabled={students.length === 0 || isLoadingInitial || bulkMutation.isPending}
+                    onClick={handleSubmitMyAttendance}
+                    disabled={!currentTeacherStatus || submitTeacherAttendanceMutation.isPending}
                   >
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    <span className="text-xs">Mark all present</span>
+                    {submitTeacherAttendanceMutation.isPending ? (
+                      <span className="text-xs">Saving…</span>
+                    ) : (
+                      <span className="text-xs">Save my attendance</span>
+                    )}
                   </Button>
+
                   <Button
                     type="button"
                     size="sm"
-                    onClick={handleSave}
-                    disabled={students.length === 0 || isLoadingInitial || bulkMutation.isPending}
+                    variant="outline"
+                    onClick={handleFinalize}
+                    disabled={isSessionFinalized || finalizeMutation.isPending || !classId || !sessionDate}
                   >
-                    {bulkMutation.isPending ? (
-                      <span className="text-xs">Saving…</span>
+                    {isSessionFinalized ? (
+                      <span className="text-xs">Session finalized</span>
+                    ) : finalizeMutation.isPending ? (
+                      <span className="text-xs">Finalizing…</span>
                     ) : (
-                      <span className="text-xs">Save attendance</span>
+                      <span className="text-xs">Finalize session</span>
                     )}
                   </Button>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          )}
 
-              {isLoadingInitial ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <Skeleton key={index} className="h-14 w-full rounded-lg" />
-                  ))}
+          {activeTab === "students" && (
+            <Card className="border border-slate-200/80 bg-white/90 shadow-sm">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>Students in this class</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleMarkAllPresent}
+                      disabled={
+                        students.length === 0 ||
+                        isLoadingInitial ||
+                        bulkMutation.isPending ||
+                        isSessionFinalized ||
+                        finalizeMutation.isPending
+                      }
+                    >
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                      <span className="text-xs">Mark all present</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={
+                        students.length === 0 ||
+                        isLoadingInitial ||
+                        bulkMutation.isPending ||
+                        isSessionFinalized ||
+                        finalizeMutation.isPending
+                      }
+                    >
+                      {bulkMutation.isPending ? (
+                        <span className="text-xs">Saving…</span>
+                      ) : (
+                        <span className="text-xs">Save attendance</span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              ) : students.length === 0 ? (
-                <div className="py-8 text-center text-xs text-muted-foreground">
-                  No students found in this class.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {students.map((s) => {
-                    const studentName = `${s.user.first_name} ${s.user.last_name}`.trim();
-                    const currentStatus = localStatuses[s.user_id] ?? s.attendance?.status;
-                    return (
-                      <div
-                        key={s.user_id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{studentName}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {s.user.student_id ? `ID: ${s.user.student_id}` : s.user.email}
-                          </p>
+
+                {isLoadingInitial ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <Skeleton key={index} className="h-14 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : students.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    No students found in this class.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {students.map((s) => {
+                      const studentName = `${s.user.first_name} ${s.user.last_name}`.trim();
+                      const currentStatus = localStatuses[s.user_id] ?? s.attendance?.status;
+                      return (
+                        <div
+                          key={s.user_id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-900">{studentName}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {s.user.student_id ? `ID: ${s.user.student_id}` : s.user.email}
+                            </p>
+                          </div>
+                          <StudentStatusPill
+                            value={currentStatus}
+                            onChange={(status) => handleSetStatus(s.user_id, status)}
+                          />
                         </div>
-                        <StudentStatusPill value={currentStatus} onChange={(status) => handleSetStatus(s.user_id, status)} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </AppLayout>
