@@ -27,7 +27,7 @@ export default function AssignmentCreatePage() {
   const userType = profile?.user_type;
   const canCreate = role === "admin" || userType === "teacher";
 
-  const subjectsQuery = useTeacherAccessibleSubjects();
+  const subjectsQuery = useTeacherAccessibleSubjects(canCreate);
   const subjects = subjectsQuery.data?.subjects ?? [];
 
   const [subjectId, setSubjectId] = useState<string>("");

@@ -15,11 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SortableTable, type ColumnConfig } from "@/components/ui/sortable-table";
 import { ListChecks, Plus, Search } from "lucide-react";
 
 type TypeFilter = AssignmentType | "all";
+
+type AssignmentRow = AssignmentSummary & { _dueDate?: Date | null };
 
 function AssignmentsHeader() {
   const { data: profile } = useProfile();
@@ -52,53 +53,79 @@ function AssignmentsHeader() {
 
 function AssignmentsTable({ assignments, isLoading }: { assignments: AssignmentSummary[]; isLoading: boolean }) {
   const router = useRouter();
+  const rows: AssignmentRow[] = useMemo(
+    () =>
+      assignments.map((a) => ({
+        ...a,
+        _dueDate: a.due_date ? new Date(a.due_date) : null,
+      })),
+    [assignments]
+  );
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-
-  if (!assignments.length) {
-    return (
-      <div className="py-10 text-center text-sm text-muted-foreground">No assignments found.</div>
-    );
-  }
+  const columns: ColumnConfig<AssignmentRow>[] = useMemo(
+    () => [
+      {
+        key: "title",
+        header: "Title",
+        sortable: true,
+        sticky: true,
+        minWidth: "220px",
+        render: (a) => (
+          <div className="flex flex-col">
+            <span className="font-medium text-sm text-slate-900">{a.title}</span>
+            {(a.subject_name || a.class_name) && (
+              <span className="text-[11px] text-muted-foreground">
+                {a.subject_name ?? "Subject"}
+                {a.class_name ? ` · ${a.class_name}` : ""}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "subject_name",
+        header: "Subject",
+        sortable: true,
+        minWidth: "140px",
+        render: (a) => a.subject_name ?? "–",
+      },
+      {
+        key: "class_name",
+        header: "Class",
+        sortable: true,
+        minWidth: "140px",
+        render: (a) => a.class_name ?? "–",
+      },
+      {
+        key: "type",
+        header: "Type",
+        sortable: true,
+        minWidth: "120px",
+        render: (a) => a.type.replace("_", " "),
+      },
+      {
+        key: "due_date",
+        header: "Due",
+        sortable: true,
+        sortKey: "_dueDate",
+        minWidth: "140px",
+        render: (a) => (a.due_date ? new Date(a.due_date).toLocaleDateString() : "—"),
+      },
+    ],
+    []
+  );
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Title</TableHead>
-          <TableHead>Subject</TableHead>
-          <TableHead>Class</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Due</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {assignments.map((a) => {
-          const due = a.due_date ? new Date(a.due_date).toLocaleDateString() : "—";
-          const typeLabel = a.type.replace("_", " ");
-          return (
-            <TableRow
-              key={a.id}
-              className="cursor-pointer hover:bg-slate-50"
-              onClick={() => router.push(`/assignments/${a.id}`)}
-            >
-              <TableCell className="font-medium text-sm text-slate-900">{a.title}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{a.subject_name ?? "–"}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{a.class_name ?? "–"}</TableCell>
-              <TableCell className="text-xs capitalize text-muted-foreground">{typeLabel}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{due}</TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+    <SortableTable
+      data={rows}
+      columns={columns}
+      loading={isLoading}
+      emptyMessage="No assignments found."
+      defaultSort={{ key: "due_date", direction: "asc" }}
+      stickyHeader
+      onRowClick={(row) => router.push(`/assignments/${row.id}`)}
+      containerClassName="border-none shadow-none"
+    />
   );
 }
 
@@ -106,6 +133,10 @@ export default function AssignmentsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [classFilter, setClassFilter] = useState<string>("all");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
 
   const params = useMemo(
     () => ({
@@ -118,6 +149,60 @@ export default function AssignmentsPage() {
   );
 
   const assignmentsQuery = useUserAssignments(params);
+  const allAssignments = assignmentsQuery.data?.assignments ?? [];
+
+  const subjectOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allAssignments
+            .map((a) => a.subject_name)
+            .filter((name): name is string => !!name)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [allAssignments]
+  );
+
+  const classOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allAssignments
+            .map((a) => a.class_name)
+            .filter((name): name is string => !!name)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [allAssignments]
+  );
+
+  const filteredAssignments = useMemo(
+    () =>
+      allAssignments.filter((a) => {
+        if (subjectFilter !== "all") {
+          if ((a.subject_name ?? "") !== subjectFilter) return false;
+        }
+        if (classFilter !== "all") {
+          if ((a.class_name ?? "") !== classFilter) return false;
+        }
+        if (dueFrom || dueTo) {
+          if (!a.due_date) return false;
+          const due = new Date(a.due_date);
+          if (Number.isNaN(due.getTime())) return false;
+          if (dueFrom) {
+            const from = new Date(dueFrom);
+            from.setHours(0, 0, 0, 0);
+            if (due < from) return false;
+          }
+          if (dueTo) {
+            const to = new Date(dueTo);
+            to.setHours(23, 59, 59, 999);
+            if (due > to) return false;
+          }
+        }
+        return true;
+      }),
+    [allAssignments, subjectFilter, classFilter, dueFrom, dueTo]
+  );
 
   return (
     <AppLayout>
@@ -160,11 +245,80 @@ export default function AssignmentsPage() {
                 </Button>
               </div>
             </div>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Filters
+                </span>
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue placeholder="All subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All subjects</SelectItem>
+                    {subjectOptions.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={classFilter} onValueChange={setClassFilter}>
+                  <SelectTrigger className="h-8 w-40 text-xs">
+                    <SelectValue placeholder="All classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All classes</SelectItem>
+                    {classOptions.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-slate-500">Due from</span>
+                  <Input
+                    type="date"
+                    value={dueFrom}
+                    onChange={(e) => setDueFrom(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-slate-500">to</span>
+                  <Input
+                    type="date"
+                    value={dueTo}
+                    onChange={(e) => setDueTo(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                {(subjectFilter !== "all" || classFilter !== "all" || dueFrom || dueTo) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-slate-500"
+                    onClick={() => {
+                      setSubjectFilter("all");
+                      setClassFilter("all");
+                      setDueFrom("");
+                      setDueTo("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
             <AssignmentsTable
-              assignments={assignmentsQuery.data?.assignments ?? []}
+              assignments={filteredAssignments}
               isLoading={assignmentsQuery.isLoading}
             />
           </div>

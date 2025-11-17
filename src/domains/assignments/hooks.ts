@@ -45,19 +45,21 @@ export function useAssignmentDetails(assignmentId: string | undefined) {
   });
 }
 
-export function useTeacherAccessibleSubjects() {
+export function useTeacherAccessibleSubjects(enabled: boolean = true) {
   return useQuery<TeacherAccessibleSubjectsResponse>({
     queryKey: ["assignments", "teacher", "subjects"],
     queryFn: fetchTeacherAccessibleSubjects,
     staleTime: 60_000,
+    enabled,
   });
 }
 
-export function useTeacherAccessibleClasses() {
+export function useTeacherAccessibleClasses(enabled: boolean = true) {
   return useQuery<TeacherAccessibleClassesResponse>({
     queryKey: ["assignments", "teacher", "classes"],
     queryFn: fetchTeacherAccessibleClasses,
     staleTime: 60_000,
+    enabled,
   });
 }
 

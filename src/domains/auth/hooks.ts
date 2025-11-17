@@ -1,16 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchProfile, login, registerAdmin, LoginPayload, RegisterAdminPayload, Profile } from "./api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { login, registerAdmin, LoginPayload, RegisterAdminPayload, Profile } from "./api";
 import { tokenStore } from "@/core/auth/token";
+import { useProfileContext } from "@/contexts/ProfileContext";
 
 export function useProfile() {
-  return useQuery<Profile>({
-    queryKey: ["auth", "me"],
-    queryFn: fetchProfile,
-    enabled: typeof window !== "undefined" && !!tokenStore.access,
-    staleTime: 60_000,
-  });
+  const ctx = useProfileContext();
+  if (!ctx) {
+    throw new Error("useProfile must be used within a ProfileProvider");
+  }
+  return ctx;
 }
 
 export function useLogin() {
