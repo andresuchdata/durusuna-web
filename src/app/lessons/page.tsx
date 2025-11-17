@@ -143,7 +143,58 @@ export default function LessonsPage() {
   if (isLoadingInitial) {
     return (
       <AppLayout>
-        <div className="min-h-[50vh] flex items-center justify-center text-muted-foreground">Loading lessons…</div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-sky-50">
+          <div className="mx-auto w-full max-w-5xl px-4 py-6 md:py-8 space-y-6">
+            <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-2xl" />
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 items-stretch md:items-end">
+                <Skeleton className="h-3 w-16" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              </div>
+            </header>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Skeleton className="h-4 w-40" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                </div>
+              </div>
+              <div className="flex gap-1">
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <Skeleton key={index} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Skeleton className="h-3 w-24" />
+              <div className="flex gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} className="h-7 w-24 rounded-full" />
+                ))}
+              </div>
+            </div>
+
+            <Card className="border border-slate-200/80 bg-white/90 shadow-sm">
+              <CardContent className="p-4 space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} className="h-20 w-full rounded-lg" />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </AppLayout>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
@@ -133,6 +133,7 @@ function AssignmentsTable({ assignments, isLoading }: { assignments: AssignmentS
 
 export default function AssignmentsPage() {
   const router = useRouter();
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
@@ -145,7 +146,7 @@ export default function AssignmentsPage() {
 
   const params = useMemo(
     () => ({
-      page: 1,
+      page,
       limit: 50,
       type,
       search: search || undefined,
@@ -154,11 +155,24 @@ export default function AssignmentsPage() {
       due_date_from: dueFrom || undefined,
       due_date_to: dueTo || undefined,
     }),
-    [type, search, subjectFilter, classFilter, dueFrom, dueTo]
+    [page, type, search, subjectFilter, classFilter, dueFrom, dueTo]
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [type, search, subjectFilter, classFilter, dueFrom, dueTo]);
 
   const assignmentsQuery = useUserAssignments(params);
   const assignments = assignmentsQuery.data?.assignments ?? [];
+  const pagination = assignmentsQuery.data?.pagination;
+
+  const total = pagination?.total ?? 0;
+  const pageSize = pagination?.limit ?? params.limit ?? 50;
+  const currentPageDisplay = pagination?.page ?? page;
+  const totalPages =
+    pagination?.totalPages ?? (pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1);
+  const start = total === 0 ? 0 : (currentPageDisplay - 1) * pageSize + 1;
+  const end = total === 0 ? 0 : Math.min(total, currentPageDisplay * pageSize);
 
   return (
     <AppLayout>
@@ -277,6 +291,69 @@ export default function AssignmentsPage() {
               assignments={assignments}
               isLoading={assignmentsQuery.isLoading}
             />
+
+            {pagination && (
+              <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
+                <div>
+                  {total > 0 ? (
+                    <span>
+                      Showing
+                      {" "}
+                      <span className="font-medium text-slate-700">{start}</span>
+                      –
+                      <span className="font-medium text-slate-700">{end}</span>
+                      {" "}
+                      of
+                      {" "}
+                      <span className="font-medium text-slate-700">{total}</span>
+                      {" "}
+                      assignments
+                    </span>
+                  ) : (
+                    <span>No assignments to display</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="hidden md:inline">
+                    Page
+                    {" "}
+                    <span className="font-medium text-slate-700">{currentPageDisplay}</span>
+                    {" "}
+                    of
+                    {" "}
+                    <span className="font-medium text-slate-700">{totalPages}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={
+                        assignmentsQuery.isLoading || !pagination || currentPageDisplay <= 1
+                      }
+                      onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      disabled={
+                        assignmentsQuery.isLoading ||
+                        !pagination ||
+                        currentPageDisplay >= totalPages
+                      }
+                      onClick={() => setPage((prev) => prev + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
