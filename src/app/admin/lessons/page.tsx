@@ -8,6 +8,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { LessonsToolbar } from "@/components/admin/LessonsToolbar";
 import { SortableTable, type ColumnConfig } from "@/components/ui/sortable-table";
 import type { SortConfig } from "@/lib/tableUtils";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +33,7 @@ import { Pencil, Trash2, MoreHorizontal, AlertCircle } from "lucide-react";
 import { useProfile } from "@/domains/auth/hooks";
 import { useAdminLessonsDashboard, useDeleteLesson } from "@/domains/lessons/hooks";
 import type { AdminLessonSummary, LessonInstanceStatus } from "@/domains/lessons/types";
-
-const PAGE_SIZE = 20;
+import { PageSizeSelect } from "@/components/ui/page-size-select";
 
 const formatDateTime = (dateString?: string | null) => {
   if (!dateString) return "—";
@@ -87,6 +87,7 @@ export default function AdminLessonsPage() {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({
     key: "scheduled_start",
     direction: "desc",
@@ -100,12 +101,12 @@ export default function AdminLessonsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, classId, subjectId, teacherId, fromDate, toDate]);
+  }, [debouncedSearch, status, classId, subjectId, teacherId, fromDate, toDate, pageSize]);
 
   const queryParams = useMemo(
     () => ({
       page,
-      limit: PAGE_SIZE,
+      limit: pageSize,
       search: debouncedSearch || undefined,
       status: status === "all" ? undefined : status,
       class_id: classId,
@@ -114,7 +115,7 @@ export default function AdminLessonsPage() {
       from: fromDate ? toISOStartOfDay(fromDate) : undefined,
       to: toDate ? toISOEndOfDay(toDate) : undefined,
     }),
-    [page, debouncedSearch, status, classId, subjectId, teacherId, fromDate, toDate]
+    [page, debouncedSearch, status, classId, subjectId, teacherId, fromDate, toDate, pageSize]
   );
 
   const lessonsQuery = useAdminLessonsDashboard(queryParams);
@@ -122,8 +123,13 @@ export default function AdminLessonsPage() {
 
   const lessons = lessonsQuery.data?.lessons ?? [];
   const pagination = lessonsQuery.data?.pagination;
-  const totalPages = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.limit)) : 1;
+  const total = pagination?.total ?? 0;
+  const effectivePageSize = pagination?.limit ?? pageSize;
+  const totalPages =
+    effectivePageSize > 0 ? Math.max(1, Math.ceil(total / effectivePageSize)) : 1;
   const currentPage = pagination?.page ?? page;
+  const start = total === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
+  const end = total === 0 ? 0 : Math.min(total, currentPage * effectivePageSize);
 
   const isAdmin = profile?.role === "admin" || profile?.user_type === "admin";
   const canView = isAdmin;
@@ -321,27 +327,56 @@ export default function AdminLessonsPage() {
             tableKey={`lessons-${currentPage}`}
           />
 
-          <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
-            <span>
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage <= 1 || lessonsQuery.isLoading}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages || lessonsQuery.isLoading}
-              >
-                Next
-              </Button>
+          <div className="flex flex-col gap-2 border-t px-4 py-3 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+              <div>
+                {total > 0 ? (
+                  <span>
+                    Showing{" "}
+                    <span className="font-medium text-slate-700">{start}</span>
+                    –
+                    <span className="font-medium text-slate-700">{end}</span>
+                    {" "}of{" "}
+                    <span className="font-medium text-slate-700">{total}</span>
+                    {" "}lessons
+                  </span>
+                ) : (
+                  <span>No lessons to display</span>
+                )}
+              </div>
+              <PageSizeSelect
+                value={effectivePageSize}
+                onChange={setPageSize}
+                disabled={lessonsQuery.isLoading}
+              />
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <span className="hidden md:inline">
+                Page{" "}
+                <span className="font-medium text-slate-700">{currentPage}</span>
+                {" "}of{" "}
+                <span className="font-medium text-slate-700">{totalPages}</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1 || lessonsQuery.isLoading}
+                  className="h-7 px-2"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages || lessonsQuery.isLoading}
+                  className="h-7 px-2"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           </div>
         </div>

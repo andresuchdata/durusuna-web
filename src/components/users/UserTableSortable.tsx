@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SortableTable, type ColumnConfig } from "@/components/ui/sortable-table";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
 import type { SortConfig } from "@/lib/tableUtils";
 import type { User } from "@/domains/users/types";
 
@@ -34,6 +35,7 @@ type UserTableSortableProps = {
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   canEdit: boolean;
   canDelete: boolean;
   onEdit?: (user: User) => void;
@@ -107,6 +109,7 @@ export function UserTableSortable({
   pageSize,
   total,
   onPageChange,
+  onPageSizeChange,
   canEdit,
   canDelete,
   onEdit,
@@ -123,6 +126,10 @@ export function UserTableSortable({
     if (!total || total <= 0) return 1;
     return Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
   }, [total, pageSize]);
+
+  const effectivePageSize = Math.max(1, pageSize);
+  const start = total === 0 ? 0 : (page - 1) * effectivePageSize + 1;
+  const end = total === 0 ? 0 : Math.min(total, page * effectivePageSize);
 
   const handleConfirmDelete = async () => {
     if (!pendingDelete || !onDelete) {
@@ -277,27 +284,56 @@ export function UserTableSortable({
       />
 
       {/* Pagination */}
-      <div className="flex items-center justify-between border-t border-l border-r border-border rounded-b-xl px-4 py-3 text-sm text-muted-foreground bg-white shadow-sm">
-        <span>
-          Page {page} of {totalPages}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(Math.max(1, page - 1))}
-            disabled={page <= 1 || isLoading}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-            disabled={page >= totalPages || isLoading}
-          >
-            Next
-          </Button>
+      <div className="flex flex-col gap-2 border-t border-l border-r border-border rounded-b-xl px-4 py-3 text-xs text-muted-foreground bg-white shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+          <div>
+            {total > 0 ? (
+              <span>
+                Showing{" "}
+                <span className="font-medium text-slate-700">{start}</span>
+                –
+                <span className="font-medium text-slate-700">{end}</span>
+                {" "}of{" "}
+                <span className="font-medium text-slate-700">{total}</span>
+                {" "}users
+              </span>
+            ) : (
+              <span>No users to display</span>
+            )}
+          </div>
+          <PageSizeSelect
+            value={effectivePageSize}
+            onChange={(value) => onPageSizeChange?.(value)}
+            disabled={isLoading}
+          />
+        </div>
+        <div className="flex items-center gap-2 justify-end">
+          <span className="hidden md:inline">
+            Page{" "}
+            <span className="font-medium text-slate-700">{page}</span>
+            {" "}of{" "}
+            <span className="font-medium text-slate-700">{totalPages}</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.max(1, page - 1))}
+              disabled={page <= 1 || isLoading}
+              className="h-7 px-2"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+              disabled={page >= totalPages || isLoading}
+              className="h-7 px-2"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
 
