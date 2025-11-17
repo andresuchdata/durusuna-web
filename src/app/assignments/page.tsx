@@ -8,6 +8,7 @@ import { useUserAssignments } from "@/domains/assignments/hooks";
 import type { AssignmentSummary, AssignmentType } from "@/domains/assignments/types";
 import { useSubjects } from "@/domains/subjects/hooks";
 import { useClasses } from "@/domains/classes/hooks";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { SortableTable, type ColumnConfig } from "@/components/ui/sortable-table";
 import { ListChecks, Plus, Search } from "lucide-react";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
 
 type TypeFilter = AssignmentType | "all";
 
@@ -134,6 +136,7 @@ function AssignmentsTable({ assignments, isLoading }: { assignments: AssignmentS
 export default function AssignmentsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
@@ -147,7 +150,7 @@ export default function AssignmentsPage() {
   const params = useMemo(
     () => ({
       page,
-      limit: 50,
+      limit: pageSize,
       type,
       search: search || undefined,
       subject_id: subjectFilter !== "all" ? subjectFilter : undefined,
@@ -155,24 +158,25 @@ export default function AssignmentsPage() {
       due_date_from: dueFrom || undefined,
       due_date_to: dueTo || undefined,
     }),
-    [page, type, search, subjectFilter, classFilter, dueFrom, dueTo]
+    [page, pageSize, type, search, subjectFilter, classFilter, dueFrom, dueTo]
   );
 
   useEffect(() => {
     setPage(1);
-  }, [type, search, subjectFilter, classFilter, dueFrom, dueTo]);
+  }, [type, search, subjectFilter, classFilter, dueFrom, dueTo, pageSize]);
 
   const assignmentsQuery = useUserAssignments(params);
   const assignments = assignmentsQuery.data?.assignments ?? [];
   const pagination = assignmentsQuery.data?.pagination;
 
   const total = pagination?.total ?? 0;
-  const pageSize = pagination?.limit ?? params.limit ?? 50;
+  const effectivePageSize = pagination?.limit ?? params.limit ?? DEFAULT_PAGE_SIZE;
   const currentPageDisplay = pagination?.page ?? page;
   const totalPages =
-    pagination?.totalPages ?? (pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1);
-  const start = total === 0 ? 0 : (currentPageDisplay - 1) * pageSize + 1;
-  const end = total === 0 ? 0 : Math.min(total, currentPageDisplay * pageSize);
+    pagination?.totalPages ??
+    (effectivePageSize > 0 ? Math.max(1, Math.ceil(total / effectivePageSize)) : 1);
+  const start = total === 0 ? 0 : (currentPageDisplay - 1) * effectivePageSize + 1;
+  const end = total === 0 ? 0 : Math.min(total, currentPageDisplay * effectivePageSize);
 
   return (
     <AppLayout>
@@ -294,26 +298,33 @@ export default function AssignmentsPage() {
 
             {pagination && (
               <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
-                <div>
-                  {total > 0 ? (
-                    <span>
-                      Showing
-                      {" "}
-                      <span className="font-medium text-slate-700">{start}</span>
-                      –
-                      <span className="font-medium text-slate-700">{end}</span>
-                      {" "}
-                      of
-                      {" "}
-                      <span className="font-medium text-slate-700">{total}</span>
-                      {" "}
-                      assignments
-                    </span>
-                  ) : (
-                    <span>No assignments to display</span>
-                  )}
+                <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+                  <div>
+                    {total > 0 ? (
+                      <span>
+                        Showing
+                        {" "}
+                        <span className="font-medium text-slate-700">{start}</span>
+                        –
+                        <span className="font-medium text-slate-700">{end}</span>
+                        {" "}
+                        of
+                        {" "}
+                        <span className="font-medium text-slate-700">{total}</span>
+                        {" "}
+                        assignments
+                      </span>
+                    ) : (
+                      <span>No assignments to display</span>
+                    )}
+                  </div>
+                  <PageSizeSelect
+                    value={effectivePageSize}
+                    onChange={setPageSize}
+                    disabled={assignmentsQuery.isLoading}
+                  />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 justify-end">
                   <span className="hidden md:inline">
                     Page
                     {" "}

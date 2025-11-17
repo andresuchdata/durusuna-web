@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   createAssignmentForClassSubject,
   fetchAssignmentDetails,
@@ -22,7 +23,7 @@ export function useUserAssignments(params: AssignmentListQueryParams | undefined
     queryKey: [
       "assignments",
       params?.page ?? 1,
-      params?.limit ?? 50,
+      params?.limit ?? DEFAULT_PAGE_SIZE,
       params?.type ?? "all",
       params?.status ?? "published",
       params?.search ?? null,
