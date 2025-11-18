@@ -1,16 +1,23 @@
 import { http } from "@/core/http/axios";
-import type {
-  AttendanceRecord,
+import type { 
+  AttendanceRecord, 
+  AttendanceSession, 
+  OpenAttendanceSessionResponse,
+  BulkUpdateAttendanceRecordPayload,
   BulkUpdateAttendanceRequestPayload,
   BulkUpdateAttendanceResponse,
-  FinalizeAttendanceResponse,
   MarkStudentAttendancePayload,
-  OpenAttendanceSessionResponse,
-  StudentAttendanceHistoryResponse,
   TeacherAttendanceStatusResponse,
   TeacherAttendanceSubmitPayload,
   TeacherAttendanceSubmitResponse,
+  FinalizeAttendanceResponse,
+  StudentAttendanceHistoryResponse
 } from "./types";
+
+export async function fetchParentChildren(): Promise<{ id: string; first_name: string; last_name: string; email: string; avatar_url: string | null }[]> {
+  const res = await http().get("/users/children");
+  return res.data.children;
+}
 
 export async function openAttendanceSession(
   classId: string,

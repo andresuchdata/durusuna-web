@@ -1,27 +1,39 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  bulkUpdateAttendance,
-  getTeacherAttendanceStatus,
-  markStudentAttendance,
-  openAttendanceSession,
-  finalizeAttendanceSession,
-  fetchStudentAttendanceHistory,
-  submitTeacherAttendance,
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  fetchParentChildren,
+  openAttendanceSession, 
+  bulkUpdateAttendance, 
+  markStudentAttendance, 
+  getTeacherAttendanceStatus, 
+  submitTeacherAttendance, 
+  finalizeAttendanceSession, 
+  fetchStudentAttendanceHistory 
 } from "./api";
-import type {
-  AttendanceRecord,
+import type { 
+  AttendanceRecord, 
+  AttendanceSession, 
+  OpenAttendanceSessionResponse,
+  BulkUpdateAttendanceRecordPayload,
   BulkUpdateAttendanceRequestPayload,
   BulkUpdateAttendanceResponse,
-  FinalizeAttendanceResponse,
   MarkStudentAttendancePayload,
-  OpenAttendanceSessionResponse,
-  StudentAttendanceHistoryResponse,
   TeacherAttendanceStatusResponse,
   TeacherAttendanceSubmitPayload,
   TeacherAttendanceSubmitResponse,
+  FinalizeAttendanceResponse,
+  StudentAttendanceHistoryResponse
 } from "./types";
+
+export function useParentChildren() {
+  return useQuery({
+    queryKey: ["parent", "children"],
+    queryFn: fetchParentChildren,
+    enabled: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
 
 export function useOpenAttendanceSession(
   classId: string | undefined,

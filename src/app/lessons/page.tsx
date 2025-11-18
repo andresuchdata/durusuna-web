@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
 import { useClasses, useClassLessons } from "@/domains/classes/hooks";
+import { useStudentAttendanceHistory, useParentChildren } from "@/domains/attendance/hooks";
+import { fetchStudentAttendanceHistory } from "@/domains/attendance/api";
+import type { AttendanceStatus } from "@/domains/attendance/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,18 +61,66 @@ function LessonStatusBadge({ status }: { status: LessonInstance["status"] }) {
   );
 }
 
-function LessonCard({ lesson }: { lesson: LessonInstance }) {
+function AttendanceStatusBadge({ status }: { status: AttendanceStatus | "not_taken" }) {
+  const map: Record<AttendanceStatus | "not_taken", { label: string; className: string }> = {
+    present: {
+      label: "Present",
+      className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    },
+    absent: {
+      label: "Absent",
+      className: "bg-rose-100 text-rose-700 border-rose-200",
+    },
+    excused: {
+      label: "Excused",
+      className: "bg-sky-100 text-sky-700 border-sky-200",
+    },
+    late: {
+      label: "Late",
+      className: "bg-amber-100 text-amber-700 border-amber-200",
+    },
+    not_taken: {
+      label: "Not yet taken",
+      className: "bg-slate-100 text-slate-600 border-slate-200",
+    },
+  };
+  const config = map[status];
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${config.className}`}>
+      {config.label}
+    </span>
+  );
+}
+
+function LessonCard({ lesson, attendanceStatus, role }: { 
+  lesson: LessonInstance; 
+  attendanceStatus?: AttendanceStatus | "not_taken";
+  role?: "parent" | "student";
+}) {
+  const showAttendance = (role === "parent" || role === "student") && lesson.status === "completed";
+  
   return (
     <Card className="border border-slate-200/80 shadow-sm">
       <CardContent className="p-4 space-y-2">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-medium text-slate-900">{lesson.title || "Lesson"}</p>
             {lesson.description && (
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{lesson.description}</p>
             )}
           </div>
-          <LessonStatusBadge status={lesson.status} />
+          <div className="flex flex-col items-end gap-1">
+            {showAttendance && attendanceStatus ? (
+              <AttendanceStatusBadge status={attendanceStatus} />
+            ) : (
+              <LessonStatusBadge status={lesson.status} />
+            )}
+            {showAttendance && attendanceStatus && attendanceStatus !== "not_taken" && (
+              <button className="text-[10px] text-indigo-600 hover:text-indigo-700 font-medium">
+                Details
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <Clock3 className="h-3.5 w-3.5" />
@@ -98,6 +150,82 @@ export default function LessonsPage() {
 
   const lessonsQuery = useClassLessons(selectedClassId);
   const allLessons: LessonInstance[] = (lessonsQuery.data as any)?.lessons ?? [];
+
+  const role = profile?.user_type;
+
+  // Fetch attendance history for students/parents
+  const studentId = role === "student" ? profile?.id : undefined;
+  const attendanceQuery = useStudentAttendanceHistory(
+    studentId, 
+    (role === "student") ? selectedClassId : undefined
+  );
+  const attendanceHistory = attendanceQuery.data?.history ?? [];
+
+  // Fetch parent's children
+  const parentChildrenQuery = useParentChildren();
+  const children = parentChildrenQuery.data ?? [];
+
+  // Debug: Log parent children data
+  useEffect(() => {
+    if (role === "parent" && children.length > 0) {
+      console.log("Parent children fetched:", children);
+    }
+  }, [role, children]);
+
+  // For parents, fetch attendance for each child
+  const parentAttendanceQueries = useQueries({
+    queries: (role === "parent" && selectedClassId && children.length > 0)
+      ? children.map(child => ({
+          queryKey: ["attendance", "student", child.id, selectedClassId],
+          queryFn: () => fetchStudentAttendanceHistory(child.id, selectedClassId),
+          enabled: !!selectedClassId,
+        }))
+      : []
+  });
+
+  // Combine all attendance records for parents
+  const allParentAttendance = useMemo(() => {
+    if (role !== "parent") return [];
+    
+    const allRecords: any[] = [];
+    parentAttendanceQueries.forEach((query: any) => {
+      if (query.data?.history) {
+        allRecords.push(...query.data.history);
+      }
+    });
+    
+    // Debug: Log combined attendance data
+    if (allRecords.length > 0) {
+      console.log("Combined parent attendance:", allRecords);
+    }
+    
+    return allRecords;
+  }, [role, parentAttendanceQueries]);
+
+  // Create a map of date -> attendance status for quick lookup
+  const attendanceByDate = useMemo(() => {
+    const map = new Map<string, AttendanceStatus | "not_taken">();
+    
+    if (role === "student") {
+      // For students, use their own attendance
+      attendanceHistory.forEach((record) => {
+        const dateStr = record.attendance_date.split("T")[0];
+        map.set(dateStr, record.status);
+      });
+    } else if (role === "parent") {
+      // For parents, use all children's attendance
+      allParentAttendance.forEach((record) => {
+        const dateStr = record.attendance_date.split("T")[0];
+        // If multiple children have attendance on the same day, prioritize any non-"not_taken" status
+        const existingStatus = map.get(dateStr);
+        if (!existingStatus || existingStatus === "not_taken") {
+          map.set(dateStr, record.status);
+        }
+      });
+    }
+    
+    return map;
+  }, [role, attendanceHistory, allParentAttendance]);
 
   const dateStripDays = useMemo(() => {
     const start = new Date(visibleStartDate);
@@ -198,8 +326,6 @@ export default function LessonsPage() {
       </AppLayout>
     );
   }
-
-  const role = profile?.user_type;
 
   const headerPill =
     role === "parent"
@@ -384,9 +510,22 @@ export default function LessonsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {filteredLessons.map((lesson) => (
-                      <LessonCard key={lesson.id} lesson={lesson} />
-                    ))}
+                    {filteredLessons.map((lesson) => {
+                      // Get attendance status for this lesson's date
+                      const lessonDate = new Date(lesson.scheduled_start).toISOString().slice(0, 10);
+                      const attendanceStatus = (role === "student" || role === "parent") 
+                        ? (attendanceByDate.get(lessonDate) ?? "not_taken")
+                        : "not_taken";
+                      
+                      return (
+                        <LessonCard 
+                          key={lesson.id} 
+                          lesson={lesson} 
+                          attendanceStatus={attendanceStatus}
+                          role={role as "parent" | "student"}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
