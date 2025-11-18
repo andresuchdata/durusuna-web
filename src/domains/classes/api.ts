@@ -5,9 +5,9 @@ import type {
   CreateClassRequest,
   UpdateClassRequest,
   ClassFilters,
-  ClassesResponse,
   ClassSubjectsResponse,
   ClassOfferingsResponse,
+  ClassStudentsResponse,
 } from "./types";
 
 /**
@@ -78,19 +78,34 @@ export async function deleteClass(classId: string): Promise<void> {
 export async function fetchClassStudents(
   classId: string,
   params?: { page?: number; limit?: number; search?: string }
-) {
-  const queryParams = new URLSearchParams();
-  if (params?.page) queryParams.append("page", String(params.page));
-  if (params?.limit) queryParams.append("limit", String(params.limit));
-  if (params?.search) queryParams.append("search", params.search);
+): Promise<ClassStudentsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.append('page', params.page.toString());
+  if (params?.limit) searchParams.append('limit', params.limit.toString());
+  if (params?.search) searchParams.append('search', params.search);
 
-  const queryString = queryParams.toString();
-  const url = queryString 
-    ? `/classes/${classId}/students?${queryString}` 
-    : `/classes/${classId}/students`;
-  
-  const res = await http().get(url);
-  return res.data;
+  const response = await http().get(
+    `/classes/${classId}/students?${searchParams.toString()}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Check students enrollment in a class
+ */
+export async function checkStudentsEnrollment(
+  classId: string,
+  studentIds: string[]
+): Promise<{ enrolled_students: Array<{ student_id: string; class_id: string; role_in_class: string; enrolled_at: string }> }> {
+  const response = await http().post(`/classes/${classId}/students/check`, {
+    student_ids: studentIds,
+  });
+
+  return response.data;
 }
 
 /**

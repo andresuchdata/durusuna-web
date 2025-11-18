@@ -126,3 +126,21 @@ export interface ClassOfferingsResponse {
   offerings: ClassOfferingSummary[];
 }
 
+export interface ClassStudentsResponse {
+  students: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string;
+    student_id?: string;
+    role_in_class?: string;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+

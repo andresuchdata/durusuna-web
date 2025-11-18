@@ -8,6 +8,7 @@ import {
   updateClass,
   deleteClass,
   fetchClassStudents,
+  checkStudentsEnrollment,
   fetchClassTeachers,
   fetchClassLessons,
   fetchClassSubjects,
@@ -98,6 +99,21 @@ export function useClassStudents(
     queryKey: ["classes", classId, "students", params],
     queryFn: () => fetchClassStudents(classId!, params),
     enabled: !!classId,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Hook to check specific students' enrollment in a class
+ */
+export function useCheckStudentsEnrollment(
+  classId: string | undefined,
+  studentIds: string[] | undefined
+) {
+  return useQuery({
+    queryKey: ["classes", classId, "students", "check", studentIds],
+    queryFn: () => checkStudentsEnrollment(classId!, studentIds!),
+    enabled: !!classId && !!studentIds && studentIds.length > 0,
     staleTime: 30_000,
   });
 }

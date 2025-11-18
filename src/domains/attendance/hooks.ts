@@ -26,11 +26,11 @@ import type {
   StudentAttendanceHistoryResponse
 } from "./types";
 
-export function useParentChildren() {
+export function useParentChildren(userType?: string) {
   return useQuery({
     queryKey: ["parent", "children"],
     queryFn: fetchParentChildren,
-    enabled: true,
+    enabled: userType === "parent",
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

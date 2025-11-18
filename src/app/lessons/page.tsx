@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProfile } from "@/domains/auth/hooks";
-import { useClasses, useClassLessons } from "@/domains/classes/hooks";
+import { useClasses, useClassLessons, useCheckStudentsEnrollment } from "@/domains/classes/hooks";
 import { useStudentAttendanceHistory, useParentChildren } from "@/domains/attendance/hooks";
 import { fetchStudentAttendanceHistory } from "@/domains/attendance/api";
 import type { AttendanceStatus } from "@/domains/attendance/types";
@@ -162,20 +162,40 @@ export default function LessonsPage() {
   const attendanceHistory = attendanceQuery.data?.history ?? [];
 
   // Fetch parent's children
-  const parentChildrenQuery = useParentChildren();
+  const parentChildrenQuery = useParentChildren(role);
   const children = parentChildrenQuery.data ?? [];
+
+  // Get child IDs for enrollment checking
+  const childIds = useMemo(() => {
+    if (role !== "parent") return [];
+    return children.map((child: any) => child.id);
+  }, [role, children]);
+
+  // Check enrollment of parent's children in the selected class
+  const enrollmentCheckQuery = useCheckStudentsEnrollment(selectedClassId, childIds);
+  const enrolledStudents = enrollmentCheckQuery.data?.enrolled_students ?? [];
+
+  // Filter children to only include those enrolled in the selected class
+  const enrolledChildren = useMemo(() => {
+    if (role !== "parent") return [];
+    
+    const enrolledStudentIds = new Set(enrolledStudents.map((student: any) => student.student_id));
+    return children.filter((child: any) => enrolledStudentIds.has(child.id));
+  }, [role, children, enrolledStudents]);
 
   // Debug: Log parent children data
   useEffect(() => {
     if (role === "parent" && children.length > 0) {
       console.log("Parent children fetched:", children);
+      console.log("Enrollment check result:", enrolledStudents);
+      console.log("Enrolled children:", enrolledChildren);
     }
-  }, [role, children]);
+  }, [role, children, enrolledStudents, enrolledChildren]);
 
-  // For parents, fetch attendance for each child
+  // For parents, fetch attendance for each child enrolled in the class
   const parentAttendanceQueries = useQueries({
-    queries: (role === "parent" && selectedClassId && children.length > 0)
-      ? children.map(child => ({
+    queries: (role === "parent" && selectedClassId && enrolledChildren.length > 0)
+      ? enrolledChildren.map(child => ({
           queryKey: ["attendance", "student", child.id, selectedClassId],
           queryFn: () => fetchStudentAttendanceHistory(child.id, selectedClassId),
           enabled: !!selectedClassId,
