@@ -4,6 +4,8 @@ import type {
   CreateLessonRequest,
   LessonDashboardQueryParams,
   LessonInstance,
+  LessonInstanceStatus,
+  LessonInstanceWithAttendance,
   UpdateLessonRequest,
 } from "./types";
 
@@ -31,4 +33,24 @@ export async function fetchAdminLessonsDashboard(
 ): Promise<AdminLessonDashboardResponse> {
   const res = await http().get("/lessons/admin/lessons", { params });
   return res.data as AdminLessonDashboardResponse;
+}
+
+export async function fetchLessonInstancesByClass(
+  classId: string,
+  params?: { from?: string; to?: string; status?: LessonInstanceStatus }
+): Promise<LessonInstance[]> {
+  const res = await http().get(`/classes/${classId}/lessons/instances`, { params });
+  return res.data as LessonInstance[];
+}
+
+export async function fetchLessonInstancesByClassWithAttendance(
+  classId: string,
+  userId: string,
+  userRole: string,
+  params?: { from?: string; to?: string; status?: LessonInstanceStatus }
+): Promise<LessonInstanceWithAttendance[]> {
+  const res = await http().get(`/classes/${classId}/lessons/instances/attendance`, { 
+    params: { ...params, user_id: userId, user_role: userRole }
+  });
+  return res.data as LessonInstanceWithAttendance[];
 }

@@ -1,12 +1,21 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLesson, deleteLesson, fetchAdminLessonsDashboard, fetchLessonById, updateLesson } from "./api";
+import { 
+  createLesson, 
+  deleteLesson, 
+  fetchAdminLessonsDashboard, 
+  fetchLessonById, 
+  fetchLessonInstancesByClass, 
+  fetchLessonInstancesByClassWithAttendance, 
+  updateLesson 
+} from "./api";
 import type {
   AdminLessonDashboardResponse,
   CreateLessonRequest,
   LessonDashboardQueryParams,
   LessonInstance,
+  LessonInstanceWithAttendance,
   UpdateLessonRequest,
 } from "./types";
 
@@ -69,5 +78,31 @@ export function useDeleteLesson() {
       qc.invalidateQueries({ queryKey: ["lessons"] });
       qc.invalidateQueries({ queryKey: ["admin-lessons-dashboard"] });
     },
+  });
+}
+
+export function useLessonInstancesByClass(
+  classId: string | undefined,
+  params?: { from?: string; to?: string; status?: LessonInstance["status"] }
+) {
+  return useQuery<LessonInstance[]>({
+    queryKey: ["lesson-instances", "class", classId, params],
+    queryFn: () => fetchLessonInstancesByClass(classId!, params),
+    enabled: !!classId,
+    staleTime: 30_000,
+  });
+}
+
+export function useLessonInstancesByClassWithAttendance(
+  classId: string | undefined,
+  userId: string | undefined,
+  userRole: string | undefined,
+  params?: { from?: string; to?: string; status?: LessonInstance["status"] }
+) {
+  return useQuery<LessonInstanceWithAttendance[]>({
+    queryKey: ["lesson-instances", "class", classId, "attendance", userId, userRole, params],
+    queryFn: () => fetchLessonInstancesByClassWithAttendance(classId!, userId!, userRole!, params),
+    enabled: !!classId && !!userId && !!userRole,
+    staleTime: 30_000,
   });
 }

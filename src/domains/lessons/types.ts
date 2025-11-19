@@ -13,6 +13,38 @@ export interface LessonInstance {
   materials: Record<string, unknown>[];
   notes?: string | null;
   cancellation_reason?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LessonInstanceWithContext extends LessonInstance {
+  class?: {
+    id: string;
+    name: string;
+    grade_level?: string | null;
+    section?: string | null;
+    academic_year: string;
+  };
+  subject?: {
+    id: string;
+    name: string;
+    code: string;
+    category?: string | null;
+  };
+  primary_teacher?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string | null;
+  };
+}
+
+export interface LessonInstanceWithAttendance extends LessonInstanceWithContext {
+  attendance_status?: 'present' | 'absent' | 'late' | 'excused' | 'not_taken';
 }
 
 export interface CreateLessonRequest {
