@@ -55,7 +55,12 @@ export function useCreateClass() {
   return useMutation({
     mutationFn: (data: CreateClassRequest) => createClass(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["classes"] });
+      // Invalidate all classes queries using predicate for more reliable invalidation
+      qc.invalidateQueries({
+        predicate: (query) => {
+          return Array.isArray(query.queryKey) && query.queryKey[0] === 'classes';
+        }
+      });
     },
   });
 }
