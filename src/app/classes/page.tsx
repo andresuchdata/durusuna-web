@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useClasses, useDeleteClass } from "@/domains/classes/hooks";
 import { useProfile } from "@/domains/auth/hooks";
@@ -27,7 +28,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClassCard } from "@/components/classes/ClassCard";
-import { EditClassDialog } from "@/components/classes/EditClassDialog";
 import { 
   Plus, 
   Search, 
@@ -44,11 +44,11 @@ import type { Class, ClassFilters } from "@/domains/classes/types";
 type ViewMode = "grid" | "list";
 
 export default function ClassesPage() {
+  const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ClassFilters>({});
   const [activeFilters, setActiveFilters] = useState<ClassFilters>({});
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -100,8 +100,7 @@ export default function ClassesPage() {
 
   const handleEdit = (classData: Class) => {
     if (!canManageClasses) return;
-    setSelectedClass(classData);
-    setEditDialogOpen(true);
+    router.push(`/classes/${classData.id}/edit`);
   };
 
   const handleDelete = (classData: Class) => {
@@ -122,10 +121,6 @@ export default function ClassesPage() {
       console.error("Failed to delete class:", error);
       alert("Failed to delete class. Please try again.");
     }
-  };
-
-  const handleEditSuccess = () => {
-    refetch();
   };
 
   // Show loading state while checking profile
@@ -401,15 +396,6 @@ export default function ClassesPage() {
             >
               <Plus className="h-7 w-7 group-hover:rotate-90 transition-transform" />
             </Link>
-          )}
-
-          {canManageClasses && (
-            <EditClassDialog
-              open={editDialogOpen}
-              onOpenChange={setEditDialogOpen}
-              onSuccess={handleEditSuccess}
-              classData={selectedClass}
-            />
           )}
 
           {/* Delete Confirmation Dialog */}

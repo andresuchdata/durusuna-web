@@ -15,8 +15,9 @@ import { useProfile } from "@/domains/auth/hooks";
 import { useCreateClass } from "@/domains/classes/hooks";
 import { useAcademicPeriods } from "@/domains/academic/hooks";
 import { useUsers } from "@/domains/users/hooks";
+import { useSubjects } from "@/domains/subjects/hooks";
 import { useToast } from "@/components/ui/use-toast";
-import { AlertCircle, ArrowLeft, Calendar, Loader2, Search, Sparkles, Users } from "lucide-react";
+import { AlertCircle, ArrowLeft, Calendar, Loader2, Search, Sparkles, Users, BookOpen } from "lucide-react";
 
 const GRADE_LEVELS = [
   "Preschool",
@@ -47,8 +48,11 @@ export default function CreateClassPage() {
     search: studentSearch || undefined,
     limit: 50,
   });
+  const { data: subjectsResponse, isLoading: subjectsLoading } = useSubjects();
 
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
@@ -84,6 +88,12 @@ export default function CreateClassPage() {
 
   const students = studentResponse?.users ?? [];
   const selectedStudents = students.filter((student) => selectedStudentIds.includes(student.id));
+  const subjects = subjectsResponse?.subjects ?? [];
+  const filteredSubjects = subjects.filter((subject) =>
+    subject.name.toLowerCase().includes(subjectSearch.toLowerCase()) &&
+    !selectedSubjectIds.includes(subject.id)
+  );
+  const selectedSubjects = subjects.filter((subject) => selectedSubjectIds.includes(subject.id));
 
   const role = profile?.role;
   const userType = profile?.user_type;
@@ -105,6 +115,12 @@ export default function CreateClassPage() {
   const toggleStudent = (id: string) => {
     setSelectedStudentIds((prev) =>
       prev.includes(id) ? prev.filter((studentId) => studentId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSubject = (id: string) => {
+    setSelectedSubjectIds((prev) =>
+      prev.includes(id) ? prev.filter((subjectId) => subjectId !== id) : [...prev, id]
     );
   };
 
@@ -137,11 +153,16 @@ export default function CreateClassPage() {
           notes: form.notes.trim() || undefined,
           preferred_period_id: selectedPeriodId,
           preselected_student_ids: selectedStudentIds,
+          preselected_subject_ids: selectedSubjectIds,
         },
       });
 
       toast({ title: "Class created", description: "You can now add teachers, subjects, and lessons." });
       router.push("/classes");
+      setSelectedStudentIds([]);
+      setSelectedSubjectIds([]);
+      setStudentSearch("");
+      setSubjectSearch("");
     } catch (error) {
       toast({
         title: "Failed to create class",
@@ -333,111 +354,200 @@ export default function CreateClassPage() {
               </form>
             </section>
 
-            <section className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                  <Users className="h-4 w-4" />
+            <div className="space-y-6">
+              <section className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Add students now or later</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Selecting students today stores them in the class settings so enrollment is a single click after approval.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Add students now or later</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Selecting students today stores them in the class settings so enrollment is a single click after approval.
-                  </p>
+
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
+                  <span>{selectedStudentIds.length} selected</span>
+                  {selectedStudentIds.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-blue-600"
+                      onClick={() => setSelectedStudentIds([])}
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
-                <span>{selectedStudentIds.length} selected</span>
-                {selectedStudentIds.length > 0 && (
-                  <button
-                    type="button"
-                    className="text-blue-600"
-                    onClick={() => setSelectedStudentIds([])}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    placeholder="Search students by name or email"
+                    className="pl-9"
+                    value={studentSearch}
+                    onChange={(event) => setStudentSearch(event.target.value)}
+                  />
+                </div>
 
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  placeholder="Search students by name or email"
-                  className="pl-9"
-                  value={studentSearch}
-                  onChange={(event) => setStudentSearch(event.target.value)}
-                />
-              </div>
-
-              <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                {studentsLoading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3">
-                      <Skeleton className="h-9 w-9 rounded-full" />
-                      <div className="flex-1 space-y-1">
-                        <Skeleton className="h-3 w-32" />
-                        <Skeleton className="h-3 w-40" />
+                <div className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
+                  {studentsLoading ? (
+                    Array.from({ length: 5 }).map((_, index) => (
+                      <div key={index} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3">
+                        <Skeleton className="h-9 w-9 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-3 w-40" />
+                        </div>
                       </div>
+                    ))
+                  ) : students.length ? (
+                    students.map((student) => {
+                      const isSelected = selectedStudentIds.includes(student.id);
+                      const initials = `${student.first_name?.charAt(0) ?? ""}${student.last_name?.charAt(0) ?? ""}`;
+                      return (
+                        <button
+                          key={student.id}
+                          type="button"
+                          onClick={() => toggleStudent(student.id)}
+                          className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
+                            isSelected ? "border-blue-500 bg-blue-50/60" : "border-slate-100 hover:border-slate-200"
+                          }`}
+                        >
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                            {initials || <Users className="h-4 w-4 text-slate-400" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-slate-900">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{student.email}</p>
+                          </div>
+                          {isSelected && <Badge variant="secondary">Added</Badge>}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
+                      {studentSearch ? "No students match your search." : "No students found yet."}
                     </div>
-                  ))
-                ) : students.length ? (
-                  students.map((student) => {
-                    const isSelected = selectedStudentIds.includes(student.id);
-                    const initials = `${student.first_name?.charAt(0) ?? ""}${student.last_name?.charAt(0) ?? ""}`;
-                    return (
-                      <button
-                        key={student.id}
-                        type="button"
-                        onClick={() => toggleStudent(student.id)}
-                        className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
-                          isSelected ? "border-blue-500 bg-blue-50/60" : "border-slate-100 hover:border-slate-200"
-                        }`}
-                      >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                          {initials || <Users className="h-4 w-4 text-slate-400" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-900">
-                            {student.first_name} {student.last_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{student.email}</p>
-                        </div>
-                        {isSelected && <Badge variant="secondary">Added</Badge>}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
-                    {studentSearch ? "No students match your search." : "No students found yet."}
+                  )}
+                </div>
+
+                {selectedStudents.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase text-slate-500">Ready to join</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedStudents.map((student) => (
+                        <Badge key={student.id} variant="outline" className="gap-2 text-xs">
+                          {student.first_name} {student.last_name}
+                          <button type="button" onClick={() => toggleStudent(student.id)} className="text-slate-400">
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {selectedStudents.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase text-slate-500">Ready to join</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedStudents.map((student) => (
-                      <Badge key={student.id} variant="outline" className="gap-2 text-xs">
-                        {student.first_name} {student.last_name}
-                        <button type="button" onClick={() => toggleStudent(student.id)} className="text-slate-400">
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs text-slate-600">
+                  <p className="font-semibold text-slate-700">Why capture students now?</p>
+                  <ul className="mt-2 space-y-1 list-disc pl-4">
+                    <li>Helps estimate capacity before publishing the class roster.</li>
+                    <li>Stores their IDs in class settings so future enrollment APIs can use them instantly.</li>
+                    <li>Speeds up guardians and notification routing once the class is live.</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Preselect subjects</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Save subjects you plan to attach so they’re ready once the class is live.
+                    </p>
                   </div>
                 </div>
-              )}
 
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs text-slate-600">
-                <p className="font-semibold text-slate-700">Why capture students now?</p>
-                <ul className="mt-2 space-y-1 list-disc pl-4">
-                  <li>Helps estimate capacity before publishing the class roster.</li>
-                  <li>Stores their IDs in class settings so future enrollment APIs can use them instantly.</li>
-                  <li>Speeds up guardians and notification routing once the class is live.</li>
-                </ul>
-              </div>
-            </section>
+                <div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
+                  <span>{selectedSubjectIds.length} selected</span>
+                  {selectedSubjectIds.length > 0 && (
+                    <button type="button" className="text-blue-600" onClick={() => setSelectedSubjectIds([])}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="Search subjects"
+                      className="pl-9"
+                      value={subjectSearch}
+                      onChange={(event) => setSubjectSearch(event.target.value)}
+                    />
+                  </div>
+
+                <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
+                  {subjectsLoading ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton key={index} className="h-10 w-full rounded-lg" />
+                    ))
+                  ) : filteredSubjects.length ? (
+                    filteredSubjects.map((subject) => {
+                      const isSelected = selectedSubjectIds.includes(subject.id);
+                      return (
+                        <button
+                          key={subject.id}
+                          type="button"
+                          onClick={() => toggleSubject(subject.id)}
+                          className={`flex w-full items-center justify-between rounded-lg border p-3 text-left text-sm transition ${
+                            isSelected ? "border-indigo-500 bg-indigo-50" : "border-slate-100 hover:border-slate-200"
+                          }`}
+                        >
+                          <span className="font-medium text-slate-900">{subject.name}</span>
+                          {isSelected && <Badge variant="secondary">Queued</Badge>}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
+                      {subjectSearch ? "No subjects match your search." : "No subjects available yet."}
+                    </div>
+                  )}
+                </div>
+
+                {selectedSubjects.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase text-slate-500">Ready to link</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSubjects.map((subject) => (
+                        <Badge key={subject.id} variant="outline" className="gap-2 text-xs">
+                          {subject.name}
+                          <button type="button" onClick={() => toggleSubject(subject.id)} className="text-slate-400">
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs text-slate-600">
+                  <p className="font-semibold text-slate-700">Why capture subjects now?</p>
+                  <ul className="mt-2 space-y-1 list-disc pl-4">
+                    <li>Gives curriculum planners a head start on schedules.</li>
+                    <li>Speeds up subject-class offering creation after approval.</li>
+                    <li>Keeps admins aligned on upcoming resource needs.</li>
+                  </ul>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </div>

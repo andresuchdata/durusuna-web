@@ -13,6 +13,10 @@ import {
   fetchClassLessons,
   fetchClassSubjects,
   fetchClassOfferings,
+  addStudentsToClass,
+  removeStudentFromClass,
+  addSubjectsToClass,
+  removeClassSubject,
 } from "./api";
 import type {
   Class,
@@ -172,5 +176,63 @@ export function useClassOfferings(classId: string | undefined, academicPeriodId?
       ),
     enabled: !!classId && !!academicPeriodId,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Hook to add students to a class
+ */
+export function useAddStudentsToClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, studentIds }: { classId: string; studentIds: string[] }) =>
+      addStudentsToClass(classId, studentIds),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId, "students"] });
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId] });
+    },
+  });
+}
+
+/**
+ * Hook to remove a student from a class
+ */
+export function useRemoveStudentFromClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, studentId }: { classId: string; studentId: string }) =>
+      removeStudentFromClass(classId, studentId),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId, "students"] });
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId] });
+    },
+  });
+}
+
+/**
+ * Hook to add subjects to a class
+ */
+export function useAddSubjectsToClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, subjectIds }: { classId: string; subjectIds: string[] }) =>
+      addSubjectsToClass(classId, subjectIds),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId, "subjects"] });
+    },
+  });
+}
+
+/**
+ * Hook to remove a subject from a class
+ */
+export function useRemoveClassSubject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, classSubjectId }: { classId: string; classSubjectId: string }) =>
+      removeClassSubject(classId, classSubjectId),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["classes", variables.classId, "subjects"] });
+    },
   });
 }

@@ -33,7 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EditClassDialog } from "@/components/classes/EditClassDialog";
 import {
   ArrowLeft,
   Users,
@@ -70,7 +69,6 @@ export default function ClassDetailPage() {
   const deleteClass = useDeleteClass();
 
   const [activeTab, setActiveTab] = useState<TabType>("students");
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const students = studentsData?.students || [];
@@ -166,7 +164,7 @@ export default function ClassDetailPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                    <DropdownMenuItem onClick={() => router.push(`/classes/${classId}/edit`)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Class
                     </DropdownMenuItem>
@@ -529,16 +527,6 @@ export default function ClassDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Edit Dialog */}
-      {canManageClass && (
-        <EditClassDialog
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          onSuccess={handleEditSuccess}
-          classData={classData}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       {canManageClass && (

@@ -1,5 +1,5 @@
 import { http } from "@/core/http/axios";
-import type {
+import {
   Class,
   ClassWithDetails,
   CreateClassRequest,
@@ -123,6 +123,13 @@ export async function addStudentsToClass(
 }
 
 /**
+ * Remove (unenroll) a student from a class
+ */
+export async function removeStudentFromClass(classId: string, studentId: string): Promise<void> {
+  await http().delete(`/classes/${classId}/students/${studentId}`);
+}
+
+/**
  * Fetch teachers in a class
  */
 export async function fetchClassTeachers(classId: string) {
@@ -144,6 +151,27 @@ export async function fetchClassLessons(classId: string) {
 export async function fetchClassSubjects(classId: string): Promise<ClassSubjectsResponse> {
   const res = await http().get(`/classes/${classId}/subjects`);
   return res.data as ClassSubjectsResponse;
+}
+
+/**
+ * Attach subjects to a class
+ */
+export async function addSubjectsToClass(
+  classId: string,
+  subjectIds: string[]
+): Promise<{ added: string[]; already_added: string[]; invalid: string[] }> {
+  const res = await http().post(`/classes/${classId}/subjects`, {
+    subject_ids: subjectIds,
+  });
+
+  return res.data;
+}
+
+/**
+ * Remove a subject from a class
+ */
+export async function removeClassSubject(classId: string, classSubjectId: string): Promise<void> {
+  await http().delete(`/classes/${classId}/subjects/${classSubjectId}`);
 }
 
 /**
