@@ -109,6 +109,20 @@ export async function checkStudentsEnrollment(
 }
 
 /**
+ * Add (enroll) students to a class
+ */
+export async function addStudentsToClass(
+  classId: string,
+  studentIds: string[]
+): Promise<{ added: string[]; already_enrolled: string[]; invalid: string[] }> {
+  const response = await http().post(`/classes/${classId}/students`, {
+    student_ids: studentIds,
+  });
+
+  return response.data;
+}
+
+/**
  * Fetch teachers in a class
  */
 export async function fetchClassTeachers(classId: string) {
