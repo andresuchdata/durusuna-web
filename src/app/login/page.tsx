@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLogin } from "@/domains/auth/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { GraduationCap } from "lucide-react";
 
 export default function LoginPage() {
   const { mutateAsync, isPending } = useLogin();
@@ -16,7 +17,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await mutateAsync({ email, password });
-      window.location.href = "/conversations";
+      window.location.href = "/";
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { data?: { message?: string } } };
@@ -30,8 +31,17 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md space-y-6">
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <div className="space-y-3 text-center">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Durusuna</h1>
+            <p className="text-sm text-muted-foreground">Your school. Your control</p>
+          </div>
+          <div className="flex justify-center">
+            <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-[#1e3a5f]">
+              <GraduationCap className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="text-sm text-muted-foreground">Use your school account</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">

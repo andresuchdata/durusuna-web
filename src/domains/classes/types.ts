@@ -82,6 +82,7 @@ export interface ClassLesson {
 }
 
 export interface ClassSubject {
+  class_subject_id?: string;
   subject_id: string;
   subject_name: string;
   subject_code?: string;
@@ -101,5 +102,45 @@ export interface ClassSubject {
 
 export interface ClassSubjectsResponse {
   subjects: ClassSubject[];
+}
+
+export interface ClassOfferingSummary {
+  class_offering_id: string;
+  subject_id: string;
+  subject_name: string;
+  subject_code?: string;
+  subject_description?: string;
+  hours_per_week?: number;
+  room?: string | null;
+  schedule?: Record<string, any> | null;
+  teacher?: {
+    id?: string | null;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    avatar_url?: string;
+  } | null;
+}
+
+export interface ClassOfferingsResponse {
+  offerings: ClassOfferingSummary[];
+}
+
+export interface ClassStudentsResponse {
+  students: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string;
+    student_id?: string;
+    role_in_class?: string;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
 }
 

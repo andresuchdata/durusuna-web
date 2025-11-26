@@ -1,12 +1,13 @@
 import { http } from "@/core/http/axios";
-import type {
+import {
   Class,
   ClassWithDetails,
   CreateClassRequest,
   UpdateClassRequest,
   ClassFilters,
-  ClassesResponse,
   ClassSubjectsResponse,
+  ClassOfferingsResponse,
+  ClassStudentsResponse,
 } from "./types";
 
 /**
@@ -77,19 +78,55 @@ export async function deleteClass(classId: string): Promise<void> {
 export async function fetchClassStudents(
   classId: string,
   params?: { page?: number; limit?: number; search?: string }
-) {
-  const queryParams = new URLSearchParams();
-  if (params?.page) queryParams.append("page", String(params.page));
-  if (params?.limit) queryParams.append("limit", String(params.limit));
-  if (params?.search) queryParams.append("search", params.search);
+): Promise<ClassStudentsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.append('page', params.page.toString());
+  if (params?.limit) searchParams.append('limit', params.limit.toString());
+  if (params?.search) searchParams.append('search', params.search);
 
-  const queryString = queryParams.toString();
-  const url = queryString 
-    ? `/classes/${classId}/students?${queryString}` 
-    : `/classes/${classId}/students`;
-  
-  const res = await http().get(url);
-  return res.data;
+  const response = await http().get(
+    `/classes/${classId}/students?${searchParams.toString()}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Check students enrollment in a class
+ */
+export async function checkStudentsEnrollment(
+  classId: string,
+  studentIds: string[]
+): Promise<{ enrolled_students: Array<{ student_id: string; class_id: string; role_in_class: string; enrolled_at: string }> }> {
+  const response = await http().post(`/classes/${classId}/students/check`, {
+    student_ids: studentIds,
+  });
+
+  return response.data;
+}
+
+/**
+ * Add (enroll) students to a class
+ */
+export async function addStudentsToClass(
+  classId: string,
+  studentIds: string[]
+): Promise<{ added: string[]; already_enrolled: string[]; invalid: string[] }> {
+  const response = await http().post(`/classes/${classId}/students`, {
+    student_ids: studentIds,
+  });
+
+  return response.data;
+}
+
+/**
+ * Remove (unenroll) a student from a class
+ */
+export async function removeStudentFromClass(classId: string, studentId: string): Promise<void> {
+  await http().delete(`/classes/${classId}/students/${studentId}`);
 }
 
 /**
@@ -116,3 +153,44 @@ export async function fetchClassSubjects(classId: string): Promise<ClassSubjects
   return res.data as ClassSubjectsResponse;
 }
 
+/**
+ * Attach subjects to a class
+ */
+export async function addSubjectsToClass(
+  classId: string,
+  subjectIds: string[]
+): Promise<{ added: string[]; already_added: string[]; invalid: string[] }> {
+  const res = await http().post(`/classes/${classId}/subjects`, {
+    subject_ids: subjectIds,
+  });
+
+  return res.data;
+}
+
+/**
+ * Remove a subject from a class
+ */
+export async function removeClassSubject(classId: string, classSubjectId: string): Promise<void> {
+  await http().delete(`/classes/${classId}/subjects/${classSubjectId}`);
+}
+
+/**
+ * Fetch class offerings (subject-class combinations) for a class
+ */
+export async function fetchClassOfferings(
+  classId: string,
+  params?: { academic_period_id?: string }
+): Promise<ClassOfferingsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.academic_period_id) {
+    queryParams.append("academic_period_id", params.academic_period_id);
+  }
+
+  const queryString = queryParams.toString();
+  const url = queryString
+    ? `/classes/${classId}/offerings?${queryString}`
+    : `/classes/${classId}/offerings`;
+
+  const res = await http().get(url);
+  return res.data as ClassOfferingsResponse;
+}

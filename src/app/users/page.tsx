@@ -11,6 +11,7 @@ import { UserBatchDialog } from "@/components/users/UserBatchDialog";
 import { Card } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { useProfile } from "@/domains/auth/hooks";
 import {
   useBatchCreateUsers,
@@ -35,6 +36,7 @@ export default function UsersPage() {
   const [dobFrom, setDobFrom] = useState<Date | undefined>(undefined);
   const [dobTo, setDobTo] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isBatchOpen, setBatchOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({
@@ -50,13 +52,14 @@ export default function UsersPage() {
   const queryParams = useMemo(
     () => ({
       page,
+      limit: pageSize,
       search: debouncedSearch || undefined,
       userType: userType === "all" ? undefined : userType,
       isActive: isActive !== null ? isActive : undefined,
       dobFrom: dobFrom ? dobFrom.toISOString().split("T")[0] : undefined,
       dobTo: dobTo ? dobTo.toISOString().split("T")[0] : undefined,
     }),
-    [page, debouncedSearch, userType, isActive, dobFrom, dobTo]
+    [page, pageSize, debouncedSearch, userType, isActive, dobFrom, dobTo]
   );
 
   const usersQuery = useUsers(queryParams);
@@ -115,7 +118,7 @@ export default function UsersPage() {
     setTimeout(() => {
       setPage(1);
     }, 0);
-  }, [debouncedSearch, userType, isActive, dobFrom, dobTo]);
+  }, [debouncedSearch, userType, isActive, dobFrom, dobTo, pageSize]);
 
   if (profileLoading) {
     return (
@@ -175,9 +178,10 @@ export default function UsersPage() {
             users={usersQuery.data?.users}
             isLoading={usersQuery.isLoading}
             page={page}
-            pageSize={usersQuery.data?.limit ?? 20}
+            pageSize={usersQuery.data?.limit ?? pageSize}
             total={usersQuery.data?.total ?? 0}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
             canEdit={canEdit}
             canDelete={canDelete}
             onEdit={handleEditClick}

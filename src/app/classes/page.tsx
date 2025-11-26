@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import { useClasses, useDeleteClass } from "@/domains/classes/hooks";
 import { useProfile } from "@/domains/auth/hooks";
@@ -26,8 +28,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClassCard } from "@/components/classes/ClassCard";
-import { CreateClassDialog } from "@/components/classes/CreateClassDialog";
-import { EditClassDialog } from "@/components/classes/EditClassDialog";
 import { 
   Plus, 
   Search, 
@@ -44,12 +44,11 @@ import type { Class, ClassFilters } from "@/domains/classes/types";
 type ViewMode = "grid" | "list";
 
 export default function ClassesPage() {
+  const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ClassFilters>({});
   const [activeFilters, setActiveFilters] = useState<ClassFilters>({});
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -101,8 +100,7 @@ export default function ClassesPage() {
 
   const handleEdit = (classData: Class) => {
     if (!canManageClasses) return;
-    setSelectedClass(classData);
-    setEditDialogOpen(true);
+    router.push(`/classes/${classData.id}/edit`);
   };
 
   const handleDelete = (classData: Class) => {
@@ -123,14 +121,6 @@ export default function ClassesPage() {
       console.error("Failed to delete class:", error);
       alert("Failed to delete class. Please try again.");
     }
-  };
-
-  const handleCreateSuccess = () => {
-    refetch();
-  };
-
-  const handleEditSuccess = () => {
-    refetch();
   };
 
   // Show loading state while checking profile
@@ -387,9 +377,11 @@ export default function ClassesPage() {
                   : "Get started by creating your first class."}
               </p>
               {!hasActiveFilters && canManageClasses && (
-                <Button onClick={() => setCreateDialogOpen(true)} size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Create Class
+                <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Link href="/classes/new" className="inline-flex items-center">
+                    <Plus className="h-5 w-5 mr-2" />
+                    Create Class
+                  </Link>
                 </Button>
               )}
             </div>
@@ -397,31 +389,13 @@ export default function ClassesPage() {
 
           {/* Floating Action Button */}
           {canManageClasses && (
-            <button
-              onClick={() => setCreateDialogOpen(true)}
+            <Link
+              href="/classes/new"
               className="fixed bottom-20 md:bottom-8 right-4 md:right-8 h-16 w-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-2xl hover:shadow-3xl transition-all flex items-center justify-center z-40 group"
               aria-label="Create class"
             >
               <Plus className="h-7 w-7 group-hover:rotate-90 transition-transform" />
-            </button>
-          )}
-
-          {/* Dialogs */}
-          {canManageClasses && (
-            <CreateClassDialog
-              open={createDialogOpen}
-              onOpenChange={setCreateDialogOpen}
-              onSuccess={handleCreateSuccess}
-            />
-          )}
-
-          {canManageClasses && (
-            <EditClassDialog
-              open={editDialogOpen}
-              onOpenChange={setEditDialogOpen}
-              onSuccess={handleEditSuccess}
-              classData={selectedClass}
-            />
+            </Link>
           )}
 
           {/* Delete Confirmation Dialog */}

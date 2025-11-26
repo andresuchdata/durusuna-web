@@ -189,16 +189,25 @@ export async function getComments(updateId: string): Promise<Comment[]> {
 
 export async function addComment(updateId: string, text: string): Promise<Comment> {
   const { data } = await axiosInstance.post(`/class-updates/${updateId}/comments`, { content: text });
-  
+
+  // Backend currently returns { comment: {...} }
+  const backendComment: BackendComment | undefined = data?.comment ?? data;
+
+  if (!backendComment) {
+    throw new Error('Failed to add comment');
+  }
+
   // Transform backend comment format to frontend format
   return {
-    id: data.id,
-    text: data.content, // Backend uses 'content', frontend uses 'text'
-    createdAt: data.created_at,
+    id: backendComment.id,
+    text: backendComment.content, // Backend uses 'content', frontend uses 'text'
+    createdAt: backendComment.created_at,
     author: {
-      id: data.author?.id || data.author_id,
-      name: data.author?.name || `${data.author?.first_name || ''} ${data.author?.last_name || ''}`.trim(),
-      avatar: data.author?.avatar_url,
+      id: backendComment.author?.id || backendComment.author_id || '',
+      name:
+        backendComment.author?.name ||
+        `${backendComment.author?.first_name || ''} ${backendComment.author?.last_name || ''}`.trim(),
+      avatar: backendComment.author?.avatar_url,
     },
   };
 }
