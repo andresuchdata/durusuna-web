@@ -6,7 +6,7 @@ import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import { HomeLessonDashboard } from "@/components/dashboard/HomeLessonDashboard";
 import { useProfile } from "@/domains/auth/hooks";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ClipboardCheck, FileText, GraduationCap, Users, BookOpenCheck } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FileText, GraduationCap, Users, BookOpenCheck, Sparkles, Calendar } from "lucide-react";
 
 type QuickAction = {
   key: string;
@@ -15,16 +15,18 @@ type QuickAction = {
   href: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   roles: Array<"admin" | "teacher" | "student" | "parent">;
+  color: string;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
     key: "attendance",
     label: "Attendance",
-    description: "Take or review today&apos;s attendance records.",
+    description: "Take or review today's attendance records.",
     href: "/attendance",
     icon: ClipboardCheck,
     roles: ["teacher"],
+    color: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
   },
   {
     key: "assignments",
@@ -33,6 +35,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: "/assignments",
     icon: FileText,
     roles: ["teacher", "student", "parent"],
+    color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
   },
   {
     key: "grades",
@@ -41,6 +44,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: "/grades",
     icon: GraduationCap,
     roles: ["teacher", "student", "parent"],
+    color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
   },
   {
     key: "classes",
@@ -49,6 +53,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: "/classes",
     icon: Users,
     roles: ["admin", "teacher", "student", "parent"],
+    color: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
   },
   {
     key: "updates",
@@ -57,72 +62,9 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: "/class-updates",
     icon: BookOpenCheck,
     roles: ["admin", "teacher", "student", "parent"],
+    color: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
   },
 ];
-
-function ParentDashboard() {
-  return (
-    <div className="w-full max-w-4xl space-y-4">
-      <header className="space-y-1">
-        <h2 className="text-xl font-semibold text-slate-900">Parent insights</h2>
-        <p className="text-sm text-muted-foreground">
-          Track your child&apos;s classes, lesson plans, and progress.
-        </p>
-      </header>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Lesson overview</p>
-            <p className="text-xs text-muted-foreground">
-              See what each class is covering on a given day, grouped by class.
-            </p>
-          </div>
-          <Button asChild size="sm" className="mt-1">
-            <Link href="/lessons">
-              See more
-              <ArrowRight className="ml-2 h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        </div>
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-xs text-muted-foreground">
-          More detailed parent dashboards (attendance summaries, progress, and alerts) will appear here in a future
-          update.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StudentDashboard() {
-  return (
-    <div className="w-full max-w-4xl space-y-4">
-      <header className="space-y-1">
-        <h2 className="text-xl font-semibold text-slate-900">Student overview</h2>
-        <p className="text-sm text-muted-foreground">Review assignments, lessons, and grades in one place.</p>
-      </header>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Today&apos;s lessons</p>
-            <p className="text-xs text-muted-foreground">
-              Choose a class and date to see the lessons planned for that day.
-            </p>
-          </div>
-          <Button asChild size="sm" className="mt-1">
-            <Link href="/lessons">
-              See more
-              <ArrowRight className="ml-2 h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        </div>
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-xs text-muted-foreground">
-          More student insights (attendance streaks, assignment deadlines, and grade trends) will appear here in a
-          future update.
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
   const { data: profile, isLoading } = useProfile();
@@ -130,7 +72,10 @@ export default function Home() {
   if (isLoading || !profile) {
     return (
       <AppLayout>
-        <div className="min-h-[50vh] flex items-center justify-center text-muted-foreground">Loading dashboard…</div>
+        <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4 text-muted-foreground animate-fade-in">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p>Loading dashboard...</p>
+        </div>
       </AppLayout>
     );
   }
@@ -144,80 +89,110 @@ export default function Home() {
     return <HomeLessonDashboard />;
   };
 
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
   return (
     <AppLayout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-emerald-50">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 md:px-8 md:py-10">
-          <section className="rounded-3xl bg-white/80 px-6 py-8 shadow-sm ring-1 ring-slate-100">
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium uppercase tracking-wide text-blue-600">Welcome back</p>
-                <h1 className="text-3xl font-semibold text-slate-900 md:text-4xl">
-                  Hi {firstName}, let&apos;s make today impactful ✨
-                </h1>
-                <p className="text-base text-muted-foreground">
-                  Access your most-used tools in one place. Attendance, assignments, grades, and more are just a click
-                  away.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild variant="default" className="gap-2">
+      <div className="min-h-screen bg-slate-50/50 dark:bg-background">
+        {/* Hero Section with modern gradient background */}
+        <div className="relative overflow-hidden bg-white dark:bg-card pb-12 pt-8 shadow-sm ring-1 ring-slate-900/5 dark:ring-white/10">
+          <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
+          <div className="absolute inset-y-0 right-0 -z-10 w-[50%] bg-gradient-to-l from-blue-50/50 to-transparent dark:from-blue-900/10" />
+
+          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-4 animate-slideRightAndFade">
+                <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                  {today}
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
+                    Welcome back, <span className="text-primary">{firstName}</span>
+                  </h1>
+                  <p className="mt-3 text-lg text-slate-600 dark:text-slate-400 max-w-2xl">
+                    Here's what's happening in your classrooms today. You have pending tasks to review.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-4 pt-2">
+                  <Button asChild size="lg" className="shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40">
                     <Link href="/classes">
-                      View classes
-                      <ArrowRight className="h-4 w-4" />
+                      View Classes
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" className="gap-2">
+                  <Button asChild variant="outline" size="lg" className="bg-white/50 backdrop-blur-sm dark:bg-slate-900/50">
                     <Link href="/conversations">
-                      Open conversations
-                      <ArrowRight className="h-4 w-4" />
+                      Messages
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </div>
               </div>
-              <div className="rounded-2xl border border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-emerald-50 p-6 text-sm text-slate-600">
-                <p className="text-base font-semibold text-slate-900">Today&apos;s tips</p>
-                <ul className="mt-3 list-disc space-y-2 pl-5">
-                  <li>Check attendance as soon as lessons start.</li>
-                  <li>Share a quick update with guardians after class.</li>
-                  <li>Review assignments that were submitted overnight.</li>
-                </ul>
-              </div>
-            </div>
-          </section>
 
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Quick actions</h2>
-                <p className="text-sm text-muted-foreground">Shortcuts tailored for your role.</p>
+              {/* Tips Card */}
+              <div className="md:w-80 lg:w-96 animate-slideLeftAndFade delay-100">
+                <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px] shadow-xl shadow-blue-500/10">
+                  <div className="rounded-2xl bg-white dark:bg-slate-900 p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="rounded-lg bg-blue-100 p-2 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                        <Sparkles className="h-5 w-5" />
+                      </div>
+                      <h3 className="font-semibold text-slate-900 dark:text-white">Daily Focus</h3>
+                    </div>
+                    <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                      <li className="flex gap-2">
+                        <span className="block h-1.5 w-1.5 mt-1.5 rounded-full bg-blue-500 shrink-0" />
+                        <span>Check attendance for morning sessions</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="block h-1.5 w-1.5 mt-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span>Review 3 pending assignment submissions</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+          {/* Quick Actions Grid */}
+          <section className="animate-slideUpAndFade delay-200">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Quick Actions</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Frequently used tools for your role</p>
+              </div>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {availableActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <Link
                     key={action.key}
                     href={action.href}
-                    className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
+                    className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-700"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:text-blue-600" />
+                    <div className={`mb-4 inline-flex rounded-lg p-3 ${action.color}`}>
+                      <Icon className="h-6 w-6" />
                     </div>
-                    <div className="mt-4 space-y-1">
-                      <p className="text-base font-semibold text-slate-900">{action.label}</p>
-                      <p className="text-sm text-muted-foreground">{action.description}</p>
-                    </div>
+                    <h3 className="mb-1 font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                      {action.label}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                      {action.description}
+                    </p>
+                    <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-gradient-to-br from-blue-50 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-blue-900/20" />
                   </Link>
                 );
               })}
             </div>
           </section>
 
-          <section className="pb-12">
+          {/* Main Dashboard Content */}
+          <section className="animate-slideUpAndFade delay-300">
             {renderRoleDashboard()}
           </section>
         </div>

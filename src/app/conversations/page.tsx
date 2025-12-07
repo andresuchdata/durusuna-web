@@ -3,12 +3,12 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
-import { useConversations } from "@/domains/chat/hooks";
+import { useConversations, useSendMessage, useMarkConversationAsRead, useToggleReaction, useSendMessageWithFiles, useConversationMessages } from "@/domains/chat/hooks";
 import { ConversationItem } from "@/domains/chat/components/ConversationItem";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile, Plus, RefreshCw } from "lucide-react";
+import { Search, MoreVertical, Edit, Video, Phone, ArrowLeft, Menu, X, Image as ImageIcon, File, Music, Smile, Plus, RefreshCw, Send, MessageSquare } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -20,19 +20,21 @@ import { EmojiPickerComponent } from "@/domains/chat/components/EmojiPicker";
 import { FileUploadModal } from "@/domains/chat/components/FileUploadModal";
 import { OptimisticMessage } from "@/domains/chat/components/OptimisticMessage";
 import { AnimatePresence, motion } from "framer-motion";
+import { useToast } from "@/components/ui/use-toast";
+import { useProfile } from "@/domains/auth/hooks";
+import { MessageItem } from "@/domains/chat/components/MessageItem";
+import { useChatRealtime } from "@/domains/chat/realtime";
 
 function ChatsPageContent() {
   const { data, isLoading, error } = useConversations();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
-  // Initialize selectedId from URL parameter or null
+
   const [selectedId, setSelectedId] = useState<string | null>(() => {
-    // Only read from URL on initial render
     return searchParams.get('selected');
   });
-  
+
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [typingInConversations, setTypingInConversations] = useState<Set<string>>(new Set());
   const selectedConversation = data?.find(c => c.id === selectedId);
@@ -43,7 +45,6 @@ function ChatsPageContent() {
   useEffect(() => {
     const selectedFromUrl = searchParams.get('selected');
     if (selectedFromUrl && selectedId === selectedFromUrl) {
-      // Clear the URL parameter after the component has mounted with the selection
       const url = new URL(window.location.href);
       url.searchParams.delete('selected');
       window.history.replaceState({}, '', url.toString());
@@ -53,23 +54,19 @@ function ChatsPageContent() {
   // Join all conversation rooms on mount
   useEffect(() => {
     if (!data || data.length === 0) return;
-    
+
     const socket = getSocket();
-    
-    // Join all conversation rooms to receive events
     data.forEach(conversation => {
       socket.emit("conversation:join", { conversationId: conversation.id });
     });
-    
+
     return () => {
-      // Leave all rooms on unmount
       data.forEach(conversation => {
         socket.emit("conversation:leave", { conversationId: conversation.id });
       });
     };
   }, [data]);
 
-  // Store refs to prevent handler recreation
   const selectedIdRef = useRef(selectedId);
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -78,7 +75,6 @@ function ChatsPageContent() {
   // Mark conversation as read when selected
   useEffect(() => {
     if (selectedId) {
-      // Optimistically update unread count to 0
       queryClient.setQueryData<Conversation[]>(["chat", "conversations"], (oldData) => {
         if (!oldData) return oldData;
         return oldData.map((conv) =>
@@ -87,12 +83,9 @@ function ChatsPageContent() {
             : conv
         );
       });
-      
-      // Mark as read after a short delay to ensure the user is viewing it
+
       const timer = setTimeout(() => {
         markAsRead(selectedId);
-        
-        // Refetch after giving backend time to process
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
         }, 500);
@@ -104,7 +97,7 @@ function ChatsPageContent() {
   // Listen for global typing and message events
   useEffect(() => {
     const socket = getSocket();
-    
+
     const handleTypingStart = (data: { conversationId?: string; conversation_id?: string }) => {
       const convId = data?.conversationId || data?.conversation_id;
       if (convId) {
@@ -113,8 +106,7 @@ function ChatsPageContent() {
           next.add(convId);
           return next;
         });
-        
-        // Auto-clear after 3 seconds as fallback
+
         setTimeout(() => {
           setTypingInConversations(prev => {
             const next = new Set(prev);
@@ -124,7 +116,7 @@ function ChatsPageContent() {
         }, 3500);
       }
     };
-    
+
     const handleTypingStop = (data: { conversationId?: string; conversation_id?: string }) => {
       const convId = data?.conversationId || data?.conversation_id;
       if (convId) {
@@ -135,18 +127,16 @@ function ChatsPageContent() {
         });
       }
     };
-    
+
     const handleConversationCreated = () => {
       queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
     };
-    
+
     const handleMessageNew = (eventData: Message) => {
       const convId = eventData?.conversationId || eventData?.conversation_id;
-      
+
       if (convId) {
-        // Auto-mark as read if this message is for the currently selected conversation
         if (selectedIdRef.current === convId) {
-          // Optimistically update unread count to 0 immediately
           queryClient.setQueryData<Conversation[]>(["chat", "conversations"], (oldData) => {
             if (!oldData) return oldData;
             return oldData.map((conv) =>
@@ -155,31 +145,21 @@ function ChatsPageContent() {
                 : conv
             );
           });
-          
-          // Then mark as read on backend
           markAsRead(convId);
-          
-          // Delay refetch to allow backend to process mark-as-read
           setTimeout(() => {
-            queryClient.invalidateQueries({ 
-              queryKey: ["chat", "conversations"]
-            });
+            queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
           }, 500);
         } else {
-          // For non-active conversations, refetch immediately
-          queryClient.invalidateQueries({ 
-            queryKey: ["chat", "conversations"]
-          });
+          queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] });
         }
       }
     };
-    
-    // Register event listeners
+
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
     socket.on('conversation:created', handleConversationCreated);
     socket.on('message:new', handleMessageNew);
-    
+
     return () => {
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
@@ -190,205 +170,181 @@ function ChatsPageContent() {
 
   return (
     <AppLayout hideBottomNav={!!selectedId}>
-      <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'} overflow-x-hidden`}>
+      <div className={`flex ${selectedId ? 'h-screen' : 'h-[calc(100vh-4rem)] md:h-screen'} overflow-hidden bg-background`}>
         {/* Conversations List */}
-        <div className={`w-full md:w-96 border-r border-border bg-white dark:bg-[#111b21] flex-shrink-0 overflow-hidden flex flex-col ${selectedId ? 'hidden md:flex' : 'flex'}`}>
-          {/* WhatsApp-style Header - Hidden on mobile when conversation selected, always visible on desktop */}
-          <div className={`bg-[#008069] dark:bg-[#008069] px-4 py-3 flex items-center justify-between ${selectedId ? 'hidden md:flex' : 'flex'}`}>
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0 md:hidden"
-                onClick={toggleMobileSidebar}
-                title="Toggle Sidebar"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <h1 className="text-xl font-semibold text-white">Chats</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0"
+        <div className={`w-full md:w-80 lg:w-96 border-r border-border bg-card flex-shrink-0 flex flex-col transition-all duration-300 ${selectedId ? 'hidden md:flex' : 'flex'}`}>
+          {/* Header */}
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Messages</h1>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] })}
-                title="Refresh Conversations"
+                title="Refresh"
               >
-                <RefreshCw className="h-5 w-5" />
+                <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-white hover:bg-[#2a3942] h-9 w-9 p-0"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 onClick={() => setShowNewConversation(true)}
-                title="New Conversation"
+                title="New Chat"
               >
-                <Edit className="h-5 w-5" />
+                <Edit className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-[#2a3942] h-9 w-9 p-0">
-                <MoreVertical className="h-5 w-5" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden text-muted-foreground"
+                onClick={toggleMobileSidebar}
+              >
+                <Menu className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          
-          {/* Search Bar - Hidden on mobile when conversation selected, always visible on desktop */}
-          <div className={`p-2 bg-white dark:bg-[#111b21] ${selectedId ? 'hidden md:block' : 'block'}`}>
+
+          {/* Search Bar */}
+          <div className="p-3 border-b border-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search or start new chat"
-                className="pl-10 bg-[#f0f2f5] dark:bg-[#202c33] border-0 rounded-lg"
+                placeholder="Search conversations..."
+                className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:bg-background transition-all"
               />
             </div>
           </div>
 
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-[#111b21]">
+          {/* List */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
             {isLoading ? (
-              <div className="animate-pulse">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-4 border-b border-border dark:border-[#2a3942] hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]">
-                    <Skeleton className="h-12 w-12 rounded-full flex-shrink-0 bg-gray-200 dark:bg-[#2a3942]" />
-                    <div className="flex-1 space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <Skeleton className="h-4 w-32 bg-gray-200 dark:bg-[#2a3942]" />
-                        <Skeleton className="h-3 w-12 bg-gray-200 dark:bg-[#2a3942]" />
-                      </div>
-                      <Skeleton className="h-3 w-3/4 bg-gray-200 dark:bg-[#2a3942]" />
+              <div className="p-3 space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-full" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : error ? (
-              <div className="p-4 text-center">
-                <p className="text-sm text-red-600 mb-2">Failed to load conversations</p>
-                <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] })}>Retry</Button>
+              <div className="p-8 text-center text-red-500">
+                Found an error loading conversations.
+                <Button variant="link" onClick={() => queryClient.invalidateQueries({ queryKey: ["chat", "conversations"] })}>Retry</Button>
               </div>
             ) : data && data.length > 0 ? (
-              <div>
-              {data.map((c) => (
-                <ConversationItem 
-                  key={c.id}
-                  c={c} 
-                  isSelected={selectedId === c.id}
-                  isTyping={typingInConversations.has(c.id)}
-                  onSelect={() => setSelectedId(c.id)}
-                />
-              ))}
+              <div className="divide-y divide-border/50">
+                {data.map((c) => (
+                  <ConversationItem
+                    key={c.id}
+                    c={c}
+                    isSelected={selectedId === c.id}
+                    isTyping={typingInConversations.has(c.id)}
+                    onSelect={() => setSelectedId(c.id)}
+                  />
+                ))}
               </div>
             ) : (
-              <div className="p-8 text-center text-muted-foreground">
-                <p>No conversations yet.</p>
-                <p className="text-sm mt-2">Start a new conversation to get started</p>
+              <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                  <MessageSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <p className="text-muted-foreground font-medium">No conversations yet</p>
+                <Button variant="link" className="text-blue-600" onClick={() => setShowNewConversation(true)}>Start a new chat</Button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Conversation Detail or Empty State */}
-        <div className={`flex-1 flex-col bg-[#efeae2] dark:bg-[#0b141a] ${selectedId ? 'flex' : 'hidden md:flex'} overflow-x-hidden min-h-0`}>
+        {/* Chat Area */}
+        <div className={`flex-1 flex flex-col bg-slate-50/50 dark:bg-background/50 ${selectedId ? 'flex' : 'hidden md:flex'} relative overflow-hidden`}>
           {selectedId && selectedConversation ? (
             <>
-              {/* WhatsApp-style Conversation Header - Sticky */}
-              <div className="sticky top-0 z-10 bg-[#f0f2f5] dark:bg-[#202c33] px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3 border-b border-border dark:border-[#2a3942] overflow-hidden w-full max-w-full">
-                {/* Back button for mobile */}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="md:hidden h-9 w-9 p-0 shrink-0" 
-                  onClick={() => setSelectedId(null)}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                
-                <button 
-                  onClick={() => router.push(`/conversations/${selectedId}/profile`)}
-                  className="shrink-0 hover:opacity-80 transition-opacity"
-                >
-                  <Avatar className="h-9 w-9 md:h-10 md:w-10 shrink-0">
-                    <AvatarImage src={
-                      (selectedConversation.type === 'direct' && selectedConversation.other_user
-                        ? selectedConversation.other_user.avatar_url
-                        : selectedConversation.avatar_url) || undefined
-                    } />
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      {(() => {
-                        if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
-                          return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
-                        }
-                        return (selectedConversation.name || 'C').charAt(0).toUpperCase();
-                      })()}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-                
-                <button 
-                  onClick={() => router.push(`/conversations/${selectedId}/profile`)}
-                  className="flex-1 min-w-0 max-w-full overflow-hidden pr-2 text-left hover:opacity-80 transition-opacity"
-                >
-                  <h2 className="font-semibold text-sm md:text-base truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">
-                    {selectedConversation.type === 'direct' && selectedConversation.other_user
-                      ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
-                      : selectedConversation.name || 'Conversation'}
-                  </h2>
-                  <p className="text-xs text-muted-foreground truncate overflow-hidden text-ellipsis whitespace-nowrap max-w-full block">online</p>
-                </button>
-                
-                <div className="flex items-center gap-1 md:gap-2 shrink-0">
-                  {/* Hide video/phone on mobile */}
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0 shrink-0">
-                    <Video className="h-5 w-5" />
+              {/* Header */}
+              <header className="h-16 px-4 flex items-center justify-between border-b border-border bg-white/80 dark:bg-card/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden -ml-2"
+                    onClick={() => setSelectedId(null)}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-10 w-10 p-0 shrink-0">
+
+                  <div className="relative group cursor-pointer" onClick={() => router.push(`/conversations/${selectedId}/profile`)}>
+                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm transition-transform group-hover:scale-105">
+                      <AvatarImage src={
+                        (selectedConversation.type === 'direct' && selectedConversation.other_user
+                          ? selectedConversation.other_user.avatar_url
+                          : selectedConversation.avatar_url) || undefined
+                      } />
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-medium">
+                        {(() => {
+                          if (selectedConversation.type === 'direct' && selectedConversation.other_user) {
+                            return `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`.charAt(0).toUpperCase();
+                          }
+                          return (selectedConversation.name || 'C').charAt(0).toUpperCase();
+                        })()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-card"></div>
+                  </div>
+
+                  <div className="flex-1 overflow-hidden" onClick={() => router.push(`/conversations/${selectedId}/profile`)}>
+                    <h2 className="font-semibold text-foreground truncate cursor-pointer hover:text-blue-600 transition-colors">
+                      {selectedConversation.type === 'direct' && selectedConversation.other_user
+                        ? `${selectedConversation.other_user.first_name} ${selectedConversation.other_user.last_name}`
+                        : selectedConversation.name || 'Conversation'}
+                    </h2>
+                    <p className="text-xs text-muted-foreground truncate">
+                      Active now
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="hidden sm:flex text-muted-foreground hover:text-primary">
                     <Phone className="h-5 w-5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0">
-                    <Search className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="hidden sm:flex text-muted-foreground hover:text-primary">
+                    <Video className="h-5 w-5" />
                   </Button>
-                  
-                  {/* Hamburger menu - mobile only */}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="md:hidden h-9 w-9 p-0 shrink-0"
-                    onClick={toggleMobileSidebar}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                  
-                  {/* More menu - desktop only */}
-                  <Button variant="ghost" size="sm" className="hidden md:flex h-9 w-9 p-0 shrink-0">
+                  <Button variant="ghost" size="icon" className="text-muted-foreground">
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </div>
+              </header>
+
+              {/* Messages Content */}
+              <div className="flex-1 relative min-h-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px]">
+                <ConversationDetail conversationId={selectedId} />
               </div>
-              
-              {/* Messages */}
-              <ConversationDetail conversationId={selectedId} />
             </>
           ) : (
-            <div className="flex items-center justify-center h-full w-full">
-              <div className="text-center space-y-4 max-w-md px-6">
-                <div className="w-24 h-24 mx-auto bg-emerald-100 dark:bg-emerald-900/20 rounded-full flex items-center justify-center">
-                  <svg className="w-12 h-12 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+            <div className="flex-1 flex items-center justify-center p-6 bg-slate-50/50 dark:bg-background/50">
+              <div className="text-center max-w-sm mx-auto">
+                <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/10">
+                  <MessageSquare className="h-10 w-10" />
                 </div>
-                <h2 className="text-2xl font-semibold text-foreground">Durusuna Web</h2>
-                <p className="text-muted-foreground">
-                  Select a conversation from the list to start messaging
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Durusuna Chat</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">
+                  Select a conversation from the sidebar to start messaging, or create a new group.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Send and receive messages, share files, and stay connected with your school community
-                </p>
+                <Button onClick={() => setShowNewConversation(true)} className="gap-2 shadow-lg shadow-blue-500/20">
+                  <Plus className="h-4 w-4" />
+                  Start New Chat
+                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* New Conversation Dialog */}
       <NewConversationDialog
         open={showNewConversation}
         onClose={() => setShowNewConversation(false)}
@@ -419,52 +375,44 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     files: File[];
     text?: string;
     timestamp: string;
-    uploadProgress: Record<string, number>; // fileId -> progress percentage
+    uploadProgress: Record<string, number>;
   }>>([]);
   const { mutateAsync: send, isPending } = useSendMessage(conversationId);
   const { mutateAsync: sendWithFiles, isPending: isUploadingFiles } = useSendMessageWithFiles(conversationId);
   const toggleReactionMutation = useToggleReaction(conversationId);
   const reactToMessage = toggleReactionMutation?.mutate;
   const reactToMessageRef = useRef(reactToMessage);
+
   useEffect(() => {
     reactToMessageRef.current = reactToMessage;
   }, [reactToMessage]);
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-
   const { mutate: markAsReadInDetail } = useMarkConversationAsRead();
-  
+
   useChatRealtime(conversationId, {
     onMessageNew: () => {
-      // Clear any remaining optimistic messages when real message arrives
-      // This prevents gap between optimistic completion and real message appearance
       setTimeout(() => {
         setOptimisticMessages(prev => {
-          // Only clear optimistic messages that are fully uploaded (100% progress)
           return prev.filter(msg => {
             const allFilesComplete = Object.values(msg.uploadProgress).every(progress => progress === 100);
-            return !allFilesComplete; // Keep messages that aren't fully uploaded yet
+            return !allFilesComplete;
           });
         });
-      }, 100); // Small delay to ensure real message is in DOM first
-      
-      // Message will be added via the hook, scroll after state updates
+      }, 100);
+
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 200);
-      
-      // Mark as read since we're viewing this conversation
+
       markAsReadInDetail(conversationId);
     },
     onTypingStart: (userId) => {
       if (userId !== me) {
         setTheirTyping(true);
-        
-        // Auto-clear after 3.5 seconds as fallback
-        setTimeout(() => {
-          setTheirTyping(false);
-        }, 3500);
+        setTimeout(() => { setTheirTyping(false); }, 3500);
       }
     },
     onTypingStop: (userId) => {
@@ -474,26 +422,20 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     },
   });
 
-  // Handle typing stop after user stops typing
   useEffect(() => {
     if (!isTyping) return;
-    
     const timer = setTimeout(() => {
       setIsTyping(false);
-      
       const socket = getSocket();
       if (socket.connected && conversationId) {
         socket.emit("typing:stop", { conversationId });
       }
-    }, 2000); // Stop after 2 seconds of no typing
-    
+    }, 2000);
     return () => clearTimeout(timer);
   }, [isTyping, conversationId]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (items.length > 0) {
-      // Use setTimeout to ensure DOM has updated
       const timer = setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
@@ -501,17 +443,6 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
     }
   }, [items.length]);
 
-  // Also scroll when items array reference changes (for realtime messages)
-  useEffect(() => {
-    if (items.length > 0) {
-      const timer = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [items]);
-
-  // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -522,139 +453,11 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
         setShowEmojiPicker(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showEmojiPicker]);
-
-  const handleReact = useCallback((messageId: string, emoji: string) => {
-    const mutateFn = reactToMessageRef.current;
-    if (!mutateFn) {
-      console.error("reactToMessage mutation is not available");
-      return;
-    }
-    if (!messageId) {
-      console.error("Message ID is missing for reaction");
-      return;
-    }
-    mutateFn({ messageId, emoji });
-  }, []);
-
-  async function onSend(e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim()) return;
-    await send({ 
-      text: text.trim(),
-      replyTo: replyTo?.id 
-    });
-    setText("");
-    setReplyTo(null);
-    inputRef.current?.focus();
-  }
-
-  const handleOptimisticMessage = (files: File[], messageText?: string, customOptimisticId?: string) => {
-    const optimisticId = customOptimisticId || `optimistic-${Date.now()}-${Math.random()}`;
-    
-    // Initialize progress for all files
-    const initialProgress: Record<string, number> = {};
-    files.forEach(file => {
-      const fileId = file.name + file.size;
-      initialProgress[fileId] = 0;
-    });
-    
-    const newOptimisticMessage = {
-      id: optimisticId,
-      files,
-      text: messageText || text.trim(),
-      timestamp: new Date().toISOString(),
-      uploadProgress: initialProgress,
-    };
-    
-    setOptimisticMessages(prev => [...prev, newOptimisticMessage]);
-    setText("");
-    setReplyTo(null);
-    
-    // Remove optimistic message after successful upload (or error)
-    // This will be handled by the actual message arrival via real-time
-    setTimeout(() => {
-      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
-    }, 10000); // Remove after 10 seconds as fallback
-    
-    return optimisticId;
-  };
-
-  const handleFileUpload = async (files: File[]) => {
-    const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
-    
-    try {
-      // Create optimistic message with initial progress
-      handleOptimisticMessage(files, undefined, optimisticId);
-      
-      await sendWithFiles({
-        text: text.trim(),
-        files,
-        replyTo: replyTo?.id,
-        onProgress: (fileIndex: number, progress: number) => {
-          if (files[fileIndex]) {
-            const fileId = files[fileIndex].name + files[fileIndex].size;
-            
-            // Update optimistic message with progress (single source of truth)
-            setOptimisticMessages(prevMessages => 
-              prevMessages.map(msg => 
-                msg.id === optimisticId 
-                  ? { ...msg, uploadProgress: { ...msg.uploadProgress, [fileId]: progress } }
-                  : msg
-              )
-            );
-          }
-        },
-        onFileComplete: (fileIndex: number) => {
-          if (files[fileIndex]) {
-            const fileId = files[fileIndex].name + files[fileIndex].size;
-            
-            // Mark file as complete (100%) in optimistic message
-            setOptimisticMessages(prevMessages => 
-              prevMessages.map(msg => 
-                msg.id === optimisticId 
-                  ? { ...msg, uploadProgress: { ...msg.uploadProgress, [fileId]: 100 } }
-                  : msg
-              )
-            );
-          }
-        }
-      });
-      
-    } catch (error: unknown) {
-      console.error('Failed to send message with files:', error);
-      
-      // Remove the optimistic message on error since upload failed
-      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
-      
-      // Show detailed error message
-      let errorMessage = "Failed to send message with files. Please try again.";
-      
-      const err = error as { response?: { data?: { details?: unknown; message?: string } }; message?: string };
-      if (err?.response?.data?.details) {
-        // Handle validation errors from backend
-        const details = err.response.data.details;
-        if (Array.isArray(details)) {
-          errorMessage = details.map((d: { message?: string }) => d.message || 'Unknown error').join(', ');
-        }
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-      
-      toast({
-        variant: "destructive",
-        title: "Failed to send message",
-        description: errorMessage,
-      });
-    }
-  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -673,250 +476,265 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const files = Array.from(e.dataTransfer.files);
+      // Directly trigger file upload from drop
       handleFileUpload(files);
     }
   };
 
+  const handleReact = useCallback((messageId: string, emoji: string) => {
+    const mutateFn = reactToMessageRef.current;
+    if (mutateFn && messageId) {
+      mutateFn({ messageId, emoji });
+    }
+  }, []);
+
+  async function onSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    await send({
+      text: text.trim(),
+      replyTo: replyTo?.id
+    });
+    setText("");
+    setReplyTo(null);
+    inputRef.current?.focus();
+  }
+
+  const handleOptimisticMessage = (files: File[], messageText?: string, customOptimisticId?: string) => {
+    const optimisticId = customOptimisticId || `optimistic-${Date.now()}-${Math.random()}`;
+    const initialProgress: Record<string, number> = {};
+    files.forEach(file => {
+      const fileId = file.name + file.size;
+      initialProgress[fileId] = 0;
+    });
+
+    setOptimisticMessages(prev => [...prev, {
+      id: optimisticId,
+      files,
+      text: messageText || text.trim(),
+      timestamp: new Date().toISOString(),
+      uploadProgress: initialProgress,
+    }]);
+
+    if (!messageText) {
+      setText("");
+      setReplyTo(null);
+    }
+
+    setTimeout(() => {
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+    }, 10000);
+
+    return optimisticId;
+  };
+
+  const handleFileUpload = async (files: File[]) => {
+    const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
+    try {
+      handleOptimisticMessage(files, undefined, optimisticId);
+      await sendWithFiles({
+        text: text.trim(),
+        files,
+        replyTo: replyTo?.id,
+        onProgress: (fileIndex: number, progress: number) => {
+          if (files[fileIndex]) {
+            const fileId = files[fileIndex].name + files[fileIndex].size;
+            setOptimisticMessages(prevMessages =>
+              prevMessages.map(msg =>
+                msg.id === optimisticId
+                  ? { ...msg, uploadProgress: { ...msg.uploadProgress, [fileId]: progress } }
+                  : msg
+              )
+            );
+          }
+        },
+        onFileComplete: (fileIndex: number) => {
+          if (files[fileIndex]) {
+            const fileId = files[fileIndex].name + files[fileIndex].size;
+            setOptimisticMessages(prevMessages =>
+              prevMessages.map(msg =>
+                msg.id === optimisticId
+                  ? { ...msg, uploadProgress: { ...msg.uploadProgress, [fileId]: 100 } }
+                  : msg
+              )
+            );
+          }
+        }
+      });
+    } catch (error: unknown) {
+      console.error('Failed to send message with files:', error);
+      setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+      toast({
+        variant: "destructive",
+        title: "Failed to send message",
+        description: "Could not upload files.",
+      });
+    }
+  };
+
   return (
-    <div 
-      className={`flex flex-col h-full w-full min-h-0 ${dragActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}
+    <div
+      className={`flex flex-col h-full w-full min-h-0 relative ${dragActive ? 'bg-blue-50/50' : ''}`}
       onDragEnter={handleDrag}
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
     >
-      {/* Drag and Drop Overlay */}
       {dragActive && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/20 border-2 border-dashed border-blue-500">
-          <div className="text-center">
-            <div className="text-2xl mb-2">📁</div>
-            <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">Drop files here to send</p>
-            <p className="text-sm text-blue-500">Release to upload files to this conversation</p>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-500 rounded-xl m-2">
+          <div className="text-center animate-bounce">
+            <div className="text-4xl mb-2">📁</div>
+            <p className="font-semibold text-blue-600">Drop files to share</p>
           </div>
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-[#efeae2] dark:bg-[#0b141a] min-h-0 pb-[80px]">
+      {/* Messages Scroll Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4 min-h-0 pb-[80px]">
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading messages…</div>
+          <div className="flex justify-center p-8">
+            <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full" />
+          </div>
         ) : error ? (
-          <div className="text-sm text-red-600">Failed to load messages</div>
+          <div className="flex flex-col items-center justify-center h-full text-red-500 gap-2">
+            <p className="text-sm">Failed to load messages</p>
+            <Button variant="outline" size="sm" onClick={loadMore}>Retry</Button>
+          </div>
         ) : (
           <>
             {hasMore && (
-              <div className="flex justify-center">
-                <Button variant="ghost" size="sm" onClick={loadMore}>Load more</Button>
+              <div className="flex justify-center py-2">
+                <Button variant="ghost" size="sm" onClick={loadMore} className="text-xs text-muted-foreground hover:text-primary">Load previous messages</Button>
               </div>
             )}
-            {items.map((msg) => (
-              <MessageItem 
-                key={msg.id} 
-                m={msg} 
-                me={me}
-                onReply={setReplyTo}
-                onReact={handleReact}
-                conversationType={conversation?.type}
-              />
-            ))}
-            
-            {/* Optimistic messages */}
-            {optimisticMessages.map((optimisticMsg) => (
-              <OptimisticMessage
-                key={optimisticMsg.id}
-                text={optimisticMsg.text}
-                files={optimisticMsg.files}
-                sender={{
-                  id: me || '',
-                  first_name: profile?.first_name || 'You',
-                  last_name: profile?.last_name || '',
-                  avatar_url: profile?.avatar_url || undefined,
-                }}
-                conversationType={conversation?.type}
-                uploadProgress={optimisticMsg.uploadProgress}
-                me={me || undefined}
-              />
-            ))}
-            
-            {/* Typing indicator */}
+
+            <div className="space-y-4">
+              {items.map((msg) => (
+                <MessageItem
+                  key={msg.id}
+                  m={msg}
+                  me={me}
+                  onReply={setReplyTo}
+                  onReact={handleReact}
+                  conversationType={conversation?.type}
+                />
+              ))}
+
+              {/* Optimistic Messages */}
+              {optimisticMessages.map((optimisticMsg) => (
+                <OptimisticMessage
+                  key={optimisticMsg.id}
+                  text={optimisticMsg.text}
+                  files={optimisticMsg.files}
+                  sender={{
+                    id: me || '',
+                    first_name: profile?.first_name || 'You',
+                    last_name: profile?.last_name || '',
+                    avatar_url: profile?.avatar_url || undefined,
+                  }}
+                  conversationType={conversation?.type}
+                  uploadProgress={optimisticMsg.uploadProgress}
+                  me={me || undefined}
+                />
+              ))}
+            </div>
+
             <AnimatePresence>
-              {theirTyping && <div className="mb-8"><TypingIndicator /></div>}
+              {theirTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="sticky bottom-0 pb-2"
+                >
+                  <TypingIndicator />
+                </motion.div>
+              )}
             </AnimatePresence>
-            
-            {/* Invisible element to scroll to */}
+
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
-      {/* Composer - Above mobile nav */}
-      <div className="pb-[calc(0.75rem+env(safe-area-inset-bottom)+12px)] md:pb-4 bg-white dark:bg-card border-t border-border">
-        {/* Reply preview - WhatsApp style */}
+      {/* Composer Area */}
+      <div className="p-3 bg-background border-t border-border z-10 w-full mb-[calc(env(safe-area-inset-bottom))]">
         <AnimatePresence>
           {replyTo && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="px-4 pt-2.5 pb-2 bg-[#e5ddd5] dark:bg-[#1f2c33] border-b border-gray-200 dark:border-gray-700"
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="px-4 py-2 bg-muted/50 rounded-lg border border-border flex items-center justify-between"
             >
-              <div className="flex items-start gap-2">
-                {/* Colored vertical bar */}
-                <div className="w-1 h-10 bg-emerald-600 rounded-full shrink-0 mt-0.5" />
-                
-                {/* Message content */}
-                <div className="flex-1 min-w-0 py-0.5 overflow-hidden">
-                  {/* "Replying to [Name]" label */}
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      Replying to
-                    </span>
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
-                      {replyTo.sender 
-                        ? `${replyTo.sender.first_name} ${replyTo.sender.last_name}`
-                        : "Unknown"}
-                    </span>
-                  </div>
-                  
-                  {/* Message preview */}
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    {/* Media/File indicator */}
-                    {replyTo.attachments && replyTo.attachments.length > 0 ? (
-                      <>
-                        {replyTo.attachments[0].type?.startsWith('image/') ? (
-                          <ImageIcon className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
-                        ) : replyTo.attachments[0].type?.startsWith('video/') ? (
-                          <Video className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
-                        ) : replyTo.attachments[0].type?.startsWith('audio/') ? (
-                          <Music className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
-                        ) : (
-                          <File className="h-4 w-4 text-gray-600 dark:text-gray-400 shrink-0" />
-                        )}
-                        <span className="text-xs text-gray-600 dark:text-gray-400 italic truncate">
-                          {replyTo.attachments[0].type?.startsWith('image/') ? 'Photo' :
-                           replyTo.attachments[0].type?.startsWith('video/') ? 'Video' :
-                           replyTo.attachments[0].type?.startsWith('audio/') ? 'Audio' :
-                           'File'}
-                        </span>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-700 dark:text-gray-300 truncate whitespace-nowrap overflow-hidden text-ellipsis">
-                        {replyTo.text || replyTo.content || "Message"}
-                      </p>
-                    )}
-                  </div>
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-1 h-8 bg-blue-500 rounded-full" />
+                <div className="flex flex-col text-xs overflow-hidden">
+                  <span className="font-semibold text-blue-600">Replying to {replyTo.sender?.first_name || 'User'}</span>
+                  <span className="text-muted-foreground truncate">{replyTo.text || 'Attachment'}</span>
                 </div>
-                
-                {/* Close button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setReplyTo(null)}
-                  className="h-6 w-6 p-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full shrink-0 mt-0.5"
-                >
-                  <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
-                </Button>
               </div>
+              <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)} className="h-6 w-6 p-0 rounded-full">
+                <X className="h-3 w-3" />
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <form onSubmit={onSend} className="p-3 md:p-4 flex gap-2 relative">
-          <div className="flex-1 relative">
-            {/* File Upload Button - Left Side */}
+        <form onSubmit={onSend} className="flex items-end gap-2 bg-background p-1">
+          <div className="flex items-center gap-1 pb-1.5">
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-full"
               onClick={() => setShowFileUploadOptions(!showFileUploadOptions)}
-              className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 z-10"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
             </Button>
-            
+            {showFileUploadOptions && (
+              <div className="absolute bottom-16 left-4 bg-popover border border-border rounded-xl shadow-lg p-1.5 flex flex-col min-w-[180px] animate-scale-in">
+                <button type="button" className="flex items-center gap-3 px-3 py-2 hover:bg-muted rounded-lg text-sm" onClick={() => { setFileUploadType('media'); setShowFileUploadModal(true); setShowFileUploadOptions(false); }}>
+                  <ImageIcon className="h-4 w-4 text-blue-500" /> Image / Video
+                </button>
+                <button type="button" className="flex items-center gap-3 px-3 py-2 hover:bg-muted rounded-lg text-sm" onClick={() => { setFileUploadType('document'); setShowFileUploadModal(true); setShowFileUploadOptions(false); }}>
+                  <File className="h-4 w-4 text-orange-500" /> Document
+                </button>
+                <button type="button" className="flex items-center gap-3 px-3 py-2 hover:bg-muted rounded-lg text-sm" onClick={() => { setFileUploadType('audio'); setShowFileUploadModal(true); setShowFileUploadOptions(false); }}>
+                  <Music className="h-4 w-4 text-purple-500" /> Audio
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 relative bg-muted/30 hover:bg-muted/50 focus-within:bg-background focus-within:ring-1 focus-within:ring-blue-500/30 rounded-2xl border border-transparent focus-within:border-blue-500/30 transition-all">
             <input
               ref={inputRef}
               value={text}
               onChange={(e) => {
-                const newValue = e.target.value;
-                setText(newValue);
-                
-                // Emit typing event DIRECTLY here
+                setText(e.target.value);
                 if (!isTyping && conversationId) {
                   setIsTyping(true);
-                  
                   const socket = getSocket();
-                  if (socket.connected) {
-                    socket.emit("typing:start", { conversationId });
-                  } else {
-                    socket.once('connect', () => {
-                      socket.emit("typing:start", { conversationId });
-                    });
-                  }
+                  if (socket.connected) socket.emit("typing:start", { conversationId });
                 }
               }}
-              placeholder="Type a message"
-              className="h-9 w-full rounded-md border border-input bg-transparent pl-10 pr-10 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              placeholder="Type your message..."
+              className="w-full bg-transparent border-0 px-4 py-3 text-sm focus:ring-0 placeholder:text-muted-foreground h-[44px]"
               disabled={isPending}
             />
-
-            {/* Emoji Picker Button - Right Side */}
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-yellow-500 hover:bg-transparent"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 z-10"
             >
-              <Smile className="h-4 w-4" />
+              <Smile className="h-5 w-5" />
             </Button>
-            
-            {/* File Upload Options */}
-            {showFileUploadOptions && (
-              <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-[#2a3942] border border-border rounded-lg shadow-xl py-2 min-w-[200px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFileUploadOptions(false);
-                    setFileUploadType('media');
-                    setShowFileUploadModal(true);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
-                >
-                  <ImageIcon className="h-5 w-5 text-blue-500" />
-                  <span>Add Image/Video</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFileUploadOptions(false);
-                    setFileUploadType('audio');
-                    setShowFileUploadModal(true);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
-                >
-                  <Music className="h-5 w-5 text-green-500" />
-                  <span>Add Audio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFileUploadOptions(false);
-                    setFileUploadType('document');
-                    setShowFileUploadModal(true);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-[#3a4a52] flex items-center gap-3"
-                >
-                  <File className="h-5 w-5 text-purple-500" />
-                  <span>Add Document</span>
-                </button>
-              </div>
-            )}
 
-            {/* Emoji Picker with proper z-index */}
             {showEmojiPicker && (
-              <div ref={emojiPickerRef} className="absolute bottom-full mb-2 right-0 z-50">
+              <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2 z-50 shadow-xl">
                 <EmojiPickerComponent
                   onSelectEmoji={(emoji) => {
                     setText(prev => prev + emoji);
@@ -929,13 +747,25 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
               </div>
             )}
           </div>
-          <Button type="submit" disabled={(isPending && !isUploadingFiles) || (!text.trim() && !isUploadingFiles)} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
-            {isUploadingFiles ? 'Uploading...' : isPending ? 'Sending...' : 'Send'}
+
+          <Button
+            type="submit"
+            disabled={!text.trim() && !isUploadingFiles}
+            size="icon"
+            className={`h-11 w-11 rounded-full shadow-md transition-all ${text.trim() || isUploadingFiles
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-muted text-muted-foreground"
+              }`}
+          >
+            {isUploadingFiles ? (
+              <div className="h-4 w-4 animate-spin border-2 border-white/50 border-t-white rounded-full" />
+            ) : (
+              <Send className="h-5 w-5 ml-0.5" />
+            )}
           </Button>
         </form>
       </div>
 
-      {/* File Upload Modal */}
       <FileUploadModal
         open={showFileUploadModal}
         onClose={() => {
@@ -950,22 +780,14 @@ function ConversationDetail({ conversationId }: { conversationId: string }) {
   );
 }
 
-// Import required hooks
-import { useToast } from "@/components/ui/use-toast";
-import { useConversationMessages, useSendMessage, useMarkConversationAsRead, useToggleReaction, useSendMessageWithFiles } from "@/domains/chat/hooks";
-import { useProfile } from "@/domains/auth/hooks";
-import { MessageItem } from "@/domains/chat/components/MessageItem";
-import { useChatRealtime } from "@/domains/chat/realtime";
-
-// Wrapper component with Suspense boundary
 export default function ChatsPage() {
   return (
     <Suspense fallback={
       <AppLayout>
-        <div className="flex h-screen items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-            <p className="text-sm text-muted-foreground">Loading conversations...</p>
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <p className="text-muted-foreground animate-pulse">Loading messages...</p>
           </div>
         </div>
       </AppLayout>
@@ -974,4 +796,3 @@ export default function ChatsPage() {
     </Suspense>
   );
 }
-
